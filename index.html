@@ -438,7 +438,7 @@ const ICON = {
 function icon(name){return ICON[name]||'';}
 
 /* ============ STATE ============ */
-let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], accounts:[], journal:[], activityLog:[], settings:{ companyName:'Z International Beauty', currency:'EGP', taxEnabled:true, taxRate:14 } };
+let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], accounts:[], journal:[], activityLog:[], settings:{ companyName:'Z International Beauty', currency:'EGP', taxEnabled:true, taxRate:14 } };
 let VIEW = 'dashboard';
 
 /* ============ LANGUAGE (عربي / English) ============ */
@@ -812,7 +812,7 @@ async function testSupaConnection(url,key){
   return true;
 }
 async function loadAll(){
-  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,accounts,journal,activityLog,settings] = await Promise.all([
+  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,accounts,journal,activityLog,settings] = await Promise.all([
     loadKey('zib_products', []),
     loadKey('zib_customers', []),
     loadKey('zib_suppliers', []),
@@ -824,12 +824,13 @@ async function loadAll(){
     loadKey('zib_consign_shipments', []),
     loadKey('zib_consign_reports', []),
     loadKey('zib_tester_handouts', []),
+    loadKey('zib_expenses', []),
     loadKey('zib_accounts', []),
     loadKey('zib_journal', []),
     loadKey('zib_activity_log', []),
     loadKey('zib_settings', { companyName:'Z International Beauty', currency:'EGP', taxEnabled:true, taxRate:14 }),
   ]);
-  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,accounts,journal,activityLog,settings};
+  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,accounts,journal,activityLog,settings};
   if(DB.settings.taxRate==null) DB.settings.taxRate = 14;
   if(DB.settings.taxEnabled==null) DB.settings.taxEnabled = true;
   ensureDefaultAccounts();
@@ -849,7 +850,7 @@ function persist(part){
   const map = {
     products:'zib_products', customers:'zib_customers', suppliers:'zib_suppliers',
     sales:'zib_sales', purchases:'zib_purchases', returns:'zib_returns', quotations:'zib_quotations', stockMoves:'zib_stock_moves',
-    consignShipments:'zib_consign_shipments', consignReports:'zib_consign_reports', testerHandouts:'zib_tester_handouts', accounts:'zib_accounts', journal:'zib_journal',
+    consignShipments:'zib_consign_shipments', consignReports:'zib_consign_reports', testerHandouts:'zib_tester_handouts', expenses:'zib_expenses', accounts:'zib_accounts', journal:'zib_journal',
     activityLog:'zib_activity_log', settings:'zib_settings'
   };
   if(part){ saveKey(map[part], DB[part]); }
@@ -923,9 +924,10 @@ const PERM_LIST = [
   {key:'manage_users', label:'إدارة المستخدمين وصلاحياتهم'},
   {key:'manage_settings', label:'تعديل إعدادات الشركة والاتصال بقاعدة البيانات'},
   {key:'approve_consignment', label:'اعتماد أذونات بضاعة الأمانة والعينات/التسترز قبل ترحيلها للحسابات'},
+  {key:'approve_expenses', label:'اعتماد المصروفات قبل ترحيلها للحسابات'},
 ];
-const DEFAULT_PERMS_ADMIN = {view_accounting:true, view_expenses:true, delete_invoices:true, delete_records:true, manage_users:true, manage_settings:true, approve_consignment:true};
-const DEFAULT_PERMS_EMPLOYEE = {view_accounting:false, view_expenses:false, delete_invoices:false, delete_records:false, manage_users:false, manage_settings:false, approve_consignment:false};
+const DEFAULT_PERMS_ADMIN = {view_accounting:true, view_expenses:true, delete_invoices:true, delete_records:true, manage_users:true, manage_settings:true, approve_consignment:true, approve_expenses:true};
+const DEFAULT_PERMS_EMPLOYEE = {view_accounting:false, view_expenses:false, delete_invoices:false, delete_records:false, manage_users:false, manage_settings:false, approve_consignment:false, approve_expenses:false};
 function currentPerms(){
   if(!isOnlineConfigured() || LOCAL_MODE) return DEFAULT_PERMS_ADMIN;
   if(!AUTH_SESSION) return DEFAULT_PERMS_EMPLOYEE;
@@ -4282,6 +4284,10 @@ function viewJournalEntry(id){
 }
 function deleteManualJournal(id){
   const j = DB.journal.find(x=>x.id===id);
+  if(j && j.sourceType==='expense' && j.sourceId){
+    deleteExpense(j.sourceId);
+    return;
+  }
   confirmAction('حذف القيد', 'هل تريد حذف هذا القيد؟', ()=>{
     DB.journal = DB.journal.filter(x=>x.id!==id);
     persist('journal');
@@ -4289,51 +4295,103 @@ function deleteManualJournal(id){
     closeModal(); render(); toast('تم حذف القيد');
   });
 }
-function openExpenseModal(){
+function openExpenseModal(editId){
+  const editExp = editId ? DB.expenses.find(x=>x.id===editId) : null;
+  if(editExp && (editExp.status||'approved')==='approved'){ toast('المصروف ده معتمد بالفعل ومترحّل في الحسابات - لا يمكن تعديله'); return; }
   const expAccs = DB.accounts.filter(a=>a.type==='expense');
   const body = `
+    <div class="alert-bar">${icon('alert')}<div>المصروف ده هيتسجل <b>بانتظار الموافقة</b> ومش هيترحّل في الحسابات إلا بعد اعتماده.</div></div>
     <div class="field"><label>حساب المصروف</label>
-      <select id="f_acc">${expAccs.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select>
+      <select id="f_acc">${expAccs.map(a=>`<option value="${a.id}" ${editExp&&editExp.accountId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
     </div>
     <div class="row2">
-      <div class="field"><label>المبلغ</label><input id="f_amt" type="number" step="0.01" value="0"></div>
-      <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>المبلغ</label><input id="f_amt" type="number" step="0.01" value="${editExp?editExp.amount:0}"></div>
+      <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${editExp?editExp.date:todayISO()}"></div>
     </div>
-    <div class="field"><label>الخزينة / الحساب البنكي</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
-    <div class="field"><label>البيان</label><input id="f_memo" placeholder="مثال: إيجار المحل - يوليو"></div>
+    <div class="field"><label>الخزينة / الحساب البنكي</label><select id="f_cashacc">${cashBankOptionsHtml(editExp?editExp.cashAccountId:null)}</select></div>
+    <div class="field"><label>البيان</label><input id="f_memo" value="${editExp?esc(editExp.memo):''}" placeholder="مثال: إيجار المحل - يوليو"></div>
   `;
-  openModal('تسجيل مصروف', body, ()=>{
+  openModal(editExp?'تعديل مصروف':'تسجيل مصروف', body, ()=>{
     const accId = document.getElementById('f_acc').value;
     const amt = parseFloat(document.getElementById('f_amt').value)||0;
     const date = document.getElementById('f_date').value || todayISO();
     const cashAcc = document.getElementById('f_cashacc').value;
     const memo = document.getElementById('f_memo').value.trim() || 'مصروف';
     if(!accId || amt<=0){ toast('أدخل بيانات صحيحة'); return false; }
-    postJournal(date, memo, [
-      {accountId:accId, debit:amt, credit:0},
-      {accountId:cashAcc, debit:0, credit:amt},
-    ], 'expense');
-    logActivity('expense_create', 'تسجيل مصروف: '+memo+' بمبلغ '+money(amt));
-    closeModal(); render(); toast('تم تسجيل المصروف');
+    if(editExp){
+      Object.assign(editExp, {accountId:accId, amount:amt, date, cashAccountId:cashAcc, memo});
+      persist('expenses');
+      logActivity('expense_edit', 'تعديل مصروف: '+memo+' بمبلغ '+money(amt));
+      closeModal(); render(); toast('تم حفظ التعديلات - لسه بانتظار الموافقة');
+    }else{
+      const exp = { id:uid(), number:nextNumber(DB.expenses,'EXP'), accountId:accId, amount:amt, date, cashAccountId:cashAcc, memo, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
+      DB.expenses.push(exp);
+      persist('expenses');
+      logActivity('expense_create', 'تسجيل مصروف: '+memo+' بمبلغ '+money(amt)+' (بانتظار الموافقة)');
+      closeModal(); render(); toast('تم الحفظ بانتظار الموافقة');
+    }
+  });
+}
+function editExpense(id){ openExpenseModal(id); }
+function approveExpense(id){
+  if(!requirePerm('approve_expenses','اعتماد المصروفات')) return;
+  const exp = DB.expenses.find(x=>x.id===id);
+  if(!exp || exp.status!=='pending') return;
+  confirmAction('اعتماد المصروف', 'سيتم ترحيل القيد المحاسبي فوراً. هل أنت متأكد؟', ()=>{
+    postJournal(exp.date, exp.memo, [
+      {accountId:exp.accountId, debit:exp.amount, credit:0},
+      {accountId:exp.cashAccountId, debit:0, credit:exp.amount},
+    ], 'expense', exp.id);
+    exp.status = 'approved'; exp.approvedBy = currentUserName(); exp.approvedAt = Date.now();
+    persist('expenses');
+    logActivity('expense_approve', 'اعتماد مصروف: '+exp.memo+' بمبلغ '+money(exp.amount));
+    closeModal(); render(); toast('تم الاعتماد والترحيل بنجاح');
+  });
+}
+function rejectExpense(id){
+  if(!requirePerm('approve_expenses','رفض المصروفات')) return;
+  const exp = DB.expenses.find(x=>x.id===id);
+  if(!exp || exp.status!=='pending') return;
+  confirmAction('رفض المصروف', 'هل تريد رفض هذا المصروف؟ لن يتم ترحيله في الحسابات.', ()=>{
+    exp.status = 'rejected'; exp.rejectedBy = currentUserName(); exp.rejectedAt = Date.now();
+    persist('expenses');
+    logActivity('expense_reject', 'رفض مصروف: '+exp.memo);
+    closeModal(); render(); toast('تم الرفض');
+  });
+}
+function deleteExpense(id){
+  if(!requirePerm('delete_invoices','حذف المصروفات')) return;
+  const exp = DB.expenses.find(x=>x.id===id);
+  if(!exp) return;
+  const isApproved = (exp.status||'approved')==='approved';
+  const msg = isApproved ? 'المصروف ده معتمد ومترحّل بالفعل - سيتم حذف القيد المحاسبي بالكامل. هل أنت متأكد؟' : 'هل تريد حذف هذا المصروف نهائياً؟';
+  confirmAction('حذف المصروف', msg, ()=>{
+    if(isApproved) removeJournalBySource(exp.id);
+    DB.expenses = DB.expenses.filter(x=>x.id!==id);
+    persist('expenses');
+    logActivity('expense_delete', 'حذف مصروف: '+exp.memo+' بمبلغ '+money(exp.amount));
+    closeModal(); render(); toast('تم الحذف بنجاح');
   });
 }
 
 /* ============ EXPENSES MODULE ============ */
 let expFilter = '', expFrom = '', expTo = '';
 function renderExpensesPage(){
-  let entries = DB.journal.filter(j=>j.sourceType==='expense');
-  if(expFrom) entries = entries.filter(j=>j.date>=expFrom);
-  if(expTo) entries = entries.filter(j=>j.date<=expTo);
-  if(expFilter) entries = entries.filter(j=>j.memo.toLowerCase().includes(expFilter.toLowerCase()));
+  let entries = [...DB.expenses];
+  if(expFrom) entries = entries.filter(e=>e.date>=expFrom);
+  if(expTo) entries = entries.filter(e=>e.date<=expTo);
+  if(expFilter) entries = entries.filter(e=>e.memo.toLowerCase().includes(expFilter.toLowerCase()));
   entries = entries.sort((a,b)=>b.createdAt-a.createdAt);
-  const totalAll = entries.reduce((s,j)=> s + j.lines.reduce((ss,l)=> ss+(l.debit||0),0), 0);
+  const approvedEntries = entries.filter(e=>(e.status||'approved')==='approved');
+  const pendingCount = DB.expenses.filter(e=>e.status==='pending').length;
+  const totalAll = approvedEntries.reduce((s,e)=>s+e.amount,0);
   const thisMonthKey = todayISO().slice(0,7);
-  const thisMonthTotal = DB.journal.filter(j=>j.sourceType==='expense' && j.date.slice(0,7)===thisMonthKey).reduce((s,j)=>s+j.lines.reduce((ss,l)=>ss+(l.debit||0),0),0);
+  const thisMonthTotal = DB.expenses.filter(e=>(e.status||'approved')==='approved' && e.date.slice(0,7)===thisMonthKey).reduce((s,e)=>s+e.amount,0);
   return `
     <div class="stat-grid">
-      <div class="stat-card red"><div class="lbl">${icon('expense')} إجمالي المصروفات (حسب الفلتر)</div><div class="val">${money(totalAll)}</div></div>
-      <div class="stat-card"><div class="lbl">مصروفات هذا الشهر</div><div class="val">${money(thisMonthTotal)}</div></div>
-      <div class="stat-card"><div class="lbl">عدد الحركات</div><div class="val">${entries.length}</div></div>
+      <div class="stat-card red"><div class="lbl">${icon('expense')} إجمالي المصروفات المعتمدة (حسب الفلتر)</div><div class="val">${money(totalAll)}</div></div>
+      <div class="stat-card"><div class="lbl">مصروفات هذا الشهر (معتمدة)</div><div class="val">${money(thisMonthTotal)}</div></div>
+      ${pendingCount>0?`<div class="stat-card gold"><div class="lbl">${icon('alert')} بانتظار الموافقة</div><div class="val">${pendingCount}</div></div>`:`<div class="stat-card"><div class="lbl">عدد الحركات</div><div class="val">${entries.length}</div></div>`}
     </div>
     <div class="card">
       <div class="card-head">
@@ -4347,15 +4405,21 @@ function renderExpensesPage(){
       </div>
       ${entries.length===0? emptyState('لا توجد مصروفات مسجلة','سجّل أول مصروف للشركة (إيجار، رواتب، كهرباء...)',true,'expense') : `
       <div class="table-wrap"><table>
-        <thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th>المبلغ</th><th>بواسطة</th><th></th></tr></thead>
-        <tbody>${entries.map(j=>{
-          const line = j.lines.find(l=> accountById(l.accountId) && accountById(l.accountId).type==='expense');
-          const acc = line ? accountById(line.accountId) : null;
-          const amt = line ? line.debit : j.lines.reduce((s,l)=>s+(l.debit||0),0);
+        <thead><tr><th>الرقم</th><th>الحالة</th><th>التاريخ</th><th>البند</th><th>البيان</th><th>المبلغ</th><th>بواسطة</th><th></th></tr></thead>
+        <tbody>${entries.map(e=>{
+          const acc = accountById(e.accountId);
+          const status = e.status||'approved';
+          const statusBadge = status==='pending' ? '<span class="badge partial">بانتظار الموافقة</span>' : status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : '<span class="badge paid">معتمد</span>';
           return `<tr>
-            <td>${fmtDate(j.date)}</td><td>${acc?esc(acc.name):'-'}</td><td>${esc(j.memo)}</td>
-            <td class="tnum">${money(amt)}</td><td>${esc(j.createdBy||'-')}</td>
-            <td><button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteManualJournal('${j.id}')">${icon('trash')}</button></td>
+            <td>${e.number||'-'}</td><td>${statusBadge}</td><td>${fmtDate(e.date)}</td><td>${acc?esc(acc.name):'-'}</td><td>${esc(e.memo)}</td>
+            <td class="tnum">${money(e.amount)}</td><td>${esc(e.createdBy||'-')}</td>
+            <td>
+              ${status==='pending'?`
+                <button class="btn btn-outline btn-icon btn-sm" onclick="editExpense('${e.id}')" title="تعديل">${icon('edit')}</button>
+                ${can('approve_expenses')?`<button class="btn btn-primary btn-sm" onclick="approveExpense('${e.id}')">${icon('plus')} اعتماد</button><button class="btn btn-danger-o btn-sm" onclick="rejectExpense('${e.id}')">رفض</button>`:''}
+              `:''}
+              ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteExpense('${e.id}')">${icon('trash')}</button>`:''}
+            </td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`}
@@ -4566,7 +4630,7 @@ function downloadBackup(){
   if(!requirePerm('manage_settings','تنزيل نسخة احتياطية')) return;
   const backup = {
     products:DB.products, customers:DB.customers, suppliers:DB.suppliers, sales:DB.sales, purchases:DB.purchases,
-    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, settings:DB.settings,
+    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, settings:DB.settings,
     exportedAt:new Date().toISOString(), version:1
   };
   const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
@@ -4588,11 +4652,11 @@ function restoreBackup(ev){
       DB.products = data.products||[]; DB.customers = data.customers||[]; DB.suppliers = data.suppliers||[];
       DB.sales = data.sales||[]; DB.purchases = data.purchases||[]; DB.returns = data.returns||[]; DB.quotations = data.quotations||[];
       DB.stockMoves = data.stockMoves||[]; DB.consignShipments = data.consignShipments||[]; DB.consignReports = data.consignReports||[];
-      DB.testerHandouts = data.testerHandouts||[];
+      DB.testerHandouts = data.testerHandouts||[]; DB.expenses = data.expenses||[];
       DB.accounts = data.accounts||DEFAULT_ACCOUNTS.map(a=>({...a})); DB.journal = data.journal||[];
       DB.activityLog = data.activityLog||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'EGP', taxEnabled:true, taxRate:14};
       ensureDefaultAccounts();
-      ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','accounts','journal','activityLog','settings'].forEach(k=>persist(k));
+      ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','accounts','journal','activityLog','settings'].forEach(k=>persist(k));
       logActivity('restore', 'استعادة نسخة احتياطية من ملف');
       closeModal(); usersLoaded=false; render(); toast('تم استعادة النسخة الاحتياطية بنجاح');
     });

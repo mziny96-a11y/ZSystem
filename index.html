@@ -62,7 +62,7 @@ html[data-theme="dark"]{
 }
 html[data-theme="dark"] body{background:var(--bg);}
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
+html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;}
 body{
   background:var(--bg);
   color:var(--text);
@@ -74,8 +74,8 @@ h1,h2,h3,.brand,.display{font-family:'El Messiri',serif;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;}
 ::-webkit-scrollbar-track{background:transparent;}
 
-#app{display:flex;flex-direction:column;min-height:100vh;}
-.app-topnav{display:flex;flex-direction:column;min-height:100vh;}
+#app{display:flex;flex-direction:column;min-height:100vh;max-width:100vw;overflow-x:hidden;}
+.app-topnav{display:flex;flex-direction:column;min-height:100vh;max-width:100vw;overflow-x:hidden;}
 
 /* TOP NAV */
 .topnav{
@@ -124,6 +124,8 @@ h1,h2,h3,.brand,.display{font-family:'El Messiri',serif;}
 .dropdown-item:hover{background:var(--surface-2);}
 .dropdown-item.active{background:var(--primary-light);color:var(--primary-dark);font-weight:700;}
 .dropdown-item.active svg{color:var(--primary-dark);}
+.dropdown-submenu{padding-inline-start:14px;border-inline-start:2px solid var(--border);margin-inline-start:11px;margin-top:2px;margin-bottom:4px;max-height:260px;overflow-y:auto;}
+.dropdown-subitem{font-size:12.5px;padding:7px 11px;white-space:normal;}
 
 .topnav-actions{display:flex;align-items:center;gap:10px;flex:none;}
 .topnav-actions .btn-outline, .mobile-menu-btn.btn-outline{
@@ -148,15 +150,16 @@ h1,h2,h3,.brand,.display{font-family:'El Messiri',serif;}
 .page-header h1{margin:0;font-size:20px;font-weight:700;color:var(--text);}
 .page-header .sub{font-size:12.5px;color:var(--text-muted);margin-top:2px;}
 .topdate{font-size:13px;color:var(--sidebar-text);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);padding:7px 14px;border-radius:10px;white-space:nowrap;}
-.content{padding:22px 28px 60px 28px;flex:1;}
+.content{padding:22px 28px 60px 28px;flex:1;min-width:0;}
 
 
 /* CARDS / GRID */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:22px;}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);transition:box-shadow .18s, transform .18s;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:16px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);transition:box-shadow .18s, transform .18s;}
 .stat-card:hover{box-shadow:0 6px 18px rgba(60,40,30,.09), 0 2px 4px rgba(60,40,30,.07);transform:translateY(-1px);}
-.stat-card .lbl{font-size:12px;color:var(--text-muted);margin-bottom:9px;display:flex;align-items:center;gap:6px;font-weight:500;}
-.stat-card .val{font-size:23px;font-weight:700;font-family:'El Messiri',serif;color:var(--text);letter-spacing:-.01em;}
+.stat-card .lbl{font-size:10.5px;color:var(--text-muted);margin-bottom:5px;display:flex;align-items:center;gap:5px;font-weight:500;}
+.stat-card .lbl svg{width:13px;height:13px;}
+.stat-card .val{font-size:17px;font-weight:700;font-family:'El Messiri',serif;color:var(--text);letter-spacing:-.01em;}
 .stat-card.rose .val{color:var(--primary);}
 .stat-card.gold .val{color:#8A6220;}
 .stat-card.green .val{color:var(--success);}
@@ -443,7 +446,7 @@ table.doc-table.cells-left td{text-align:left;}
 <body>
 <div id="app" class="app-topnav">
   <header class="topnav">
-    <button class="btn btn-outline btn-icon mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileDrawer()" title="القائمة">${icon('menu')}</button>
+    <button class="btn btn-outline btn-icon mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileDrawer()" title="القائمة"></button>
     <div class="topnav-brand">
       <div class="brand-mark" id="sidebarLogo">Z</div>
       <div class="brand-titles">
@@ -463,7 +466,7 @@ table.doc-table.cells-left td{text-align:left;}
   <aside class="mobile-drawer" id="mobileDrawer">
     <div class="mobile-drawer-head">
       <span style="font-weight:700;font-size:15px;">القائمة</span>
-      <button class="btn btn-outline btn-icon" onclick="closeMobileDrawer()">${icon('close')}</button>
+      <button class="btn btn-outline btn-icon" id="drawerCloseBtn" onclick="closeMobileDrawer()"></button>
     </div>
     <nav id="mobileNavList"></nav>
   </aside>
@@ -540,6 +543,10 @@ function applyThemeToDom(){
   if(btn) btn.innerHTML = THEME==='dark' ? icon('sun') : icon('moon');
   const searchBtn = document.getElementById('globalSearchBtn');
   if(searchBtn && !searchBtn.innerHTML) searchBtn.innerHTML = icon('search');
+  const menuBtn = document.getElementById('mobileMenuBtn');
+  if(menuBtn && !menuBtn.innerHTML) menuBtn.innerHTML = icon('menu');
+  const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+  if(drawerCloseBtn && !drawerCloseBtn.innerHTML) drawerCloseBtn.innerHTML = icon('close');
 }
 function toggleTheme(){
   THEME = THEME==='dark' ? 'light' : 'dark';
@@ -578,6 +585,7 @@ const T = {
   save:{ar:'حفظ',en:'Save'}, cancel:{ar:'إلغاء',en:'Cancel'}, confirmDelete:{ar:'تأكيد الحذف',en:'Confirm Delete'},
   add:{ar:'إضافة',en:'Add'}, edit:{ar:'تعديل',en:'Edit'}, delete:{ar:'حذف',en:'Delete'}, search:{ar:'بحث...',en:'Search...'},
   close:{ar:'إغلاق',en:'Close'}, system_name:{ar:'نظام الحسابات',en:'Accounting System'},
+  saving:{ar:'جارِ الحفظ...',en:'Saving...'},
   grp_sales:{ar:'المبيعات',en:'Sales'}, grp_purchases:{ar:'المشتريات',en:'Purchases'}, grp_inventory:{ar:'المخازن',en:'Inventory'},
   grp_expenses:{ar:'المصروفات',en:'Expenses'}, grp_accounting:{ar:'الحسابات',en:'Accounting'},
 };
@@ -613,6 +621,7 @@ const DEFAULT_ACCOUNTS = [
   {id:'acc_cogs', code:'5000', name:'تكلفة البضاعة المباعة', type:'expense'},
   {id:'acc_expense', code:'5100', name:'مصروفات عمومية وإدارية', type:'expense'},
   {id:'acc_opex', code:'5150', name:'مصاريف تشغيل', type:'expense'},
+  {id:'acc_mkt_commission', code:'5165', name:'عمولات تسويقية', type:'expense'},
   {id:'acc_inv_adj', code:'5200', name:'فروقات جرد المخزون', type:'expense'},
   {id:'acc_consign_inv', code:'1250', name:'بضاعة أمانة لدى الغير', type:'asset'},
   {id:'acc_consign_comm', code:'5300', name:'عمولات بيع بالأمانة', type:'expense'},
@@ -631,6 +640,21 @@ function termById(id){ return PAYMENT_TERMS.find(t=>t.id===id) || PAYMENT_TERMS[
 function addDays(dateStr, days){ const d = new Date(dateStr); d.setDate(d.getDate()+(days||0)); return d.toISOString().slice(0,10); }
 function isOverdue(inv){ return inv.dueDate && inv.dueDate < todayISO() && (inv.total-inv.paidAmount) > 0.009; }
 
+const REPORT_TYPES = [
+  {id:'sales', label:'تقرير المبيعات'},
+  {id:'purchases', label:'تقرير المشتريات'},
+  {id:'returns', label:'المرتجعات'},
+  {id:'vat', label:'تقرير الضريبة'},
+  {id:'inventory', label:'تقييم المخزون'},
+  {id:'top', label:'الأكثر مبيعاً'},
+  {id:'balances', label:'أرصدة العملاء والموردين'},
+  {id:'aging', label:'أعمار الديون'},
+  {id:'commissions', label:'عمولات المندوبين'},
+  {id:'trial', label:'ميزان المراجعة'},
+  {id:'ledger', label:'كشف حساب'},
+  {id:'income', label:'قائمة الدخل'},
+  {id:'balancesheet', label:'الميزانية العمومية'},
+];
 const NAV_GROUPS = [
   {group:null, items:[
     {id:'dashboard', icon:'dashboard'},
@@ -639,7 +663,7 @@ const NAV_GROUPS = [
     {id:'treasury', icon:'bank'},
     {id:'accounts', icon:'book'},
     {id:'journal', icon:'journal'},
-    {id:'reports', icon:'reports'},
+    {id:'reports', icon:'reports', submenu:REPORT_TYPES},
   ]},
   {group:'grp_sales', items:[
     {id:'crm', icon:'customers'},
@@ -1026,6 +1050,57 @@ function supplierById(id){ return DB.suppliers.find(s=>s.id===id); }
 function accountById(id){ return DB.accounts.find(a=>a.id===id); }
 
 /* ============ ACCOUNTING CORE (double-entry) ============ */
+function quickAddPartyHtml(kind){
+  return `
+    <button type="button" class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="toggleQuickAddParty('${kind}')">${icon('plus')} ${kind==='customers'?'عميل':'مورد'} جديد</button>
+    <div id="quickAddPartyPanel" data-kind="${kind}" style="display:none;margin-top:8px;padding:10px;background:var(--surface-2);border-radius:8px;">
+      <div class="row2">
+        <input id="qa_name" placeholder="${kind==='customers'?'اسم العميل':'اسم المورد'} *">
+        <input id="qa_phone" placeholder="رقم الهاتف (اختياري)">
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" onclick="saveQuickAddParty()">${icon('plus')} حفظ</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="toggleQuickAddParty('${kind}')">إلغاء</button>
+    </div>
+  `;
+}
+function toggleQuickAddParty(kind){
+  const panel = document.getElementById('quickAddPartyPanel');
+  if(!panel) return;
+  if(panel.style.display==='none'){
+    panel.style.display = 'block';
+    panel.dataset.kind = kind;
+    setTimeout(()=>{ const n=document.getElementById('qa_name'); if(n) n.focus(); }, 0);
+  }else{
+    panel.style.display = 'none';
+  }
+}
+function saveQuickAddParty(){
+  const panel = document.getElementById('quickAddPartyPanel');
+  if(!panel) return;
+  const kind = panel.dataset.kind;
+  const nameEl = document.getElementById('qa_name');
+  const phoneEl = document.getElementById('qa_phone');
+  const name = nameEl.value.trim();
+  if(!name){ toast('اكتب الاسم أولاً'); return; }
+  const phone = phoneEl.value.trim();
+  const dupName = DB[kind].find(p=>p.name.trim().toLowerCase()===name.toLowerCase());
+  if(dupName){ toast('موجود بالفعل '+(kind==='customers'?'عميل':'مورد')+' بنفس الاسم - اختره من القائمة'); return; }
+  const data = { id:uid(), name, phone, address:'', notes:'' };
+  DB[kind].push(data);
+  persist(kind);
+  logActivity('party_create', 'إضافة سريعة لـ'+(kind==='customers'?'عميل ':'مورد ')+name);
+  const sel = document.getElementById('f_party');
+  if(sel){
+    const opt = document.createElement('option');
+    opt.value = data.id; opt.textContent = name;
+    sel.appendChild(opt);
+    sel.value = data.id;
+    sel.dispatchEvent(new Event('change'));
+  }
+  nameEl.value = ''; phoneEl.value = '';
+  panel.style.display = 'none';
+  toast('تم إضافة '+(kind==='customers'?'العميل':'المورد')+' بنجاح - وتم اختياره في الفاتورة');
+}
 function currentUserName(){ return AUTH_SESSION ? (AUTH_SESSION.fullName||AUTH_SESSION.username) : ''; }
 function isAdminUser(){ return !isOnlineConfigured() || LOCAL_MODE || (AUTH_SESSION && AUTH_SESSION.role==='admin'); }
 
@@ -1034,6 +1109,7 @@ const PERM_LIST = [
   {key:'view_accounting', label:'عرض الحسابات (دليل الحسابات + القيود اليومية + التقارير)'},
   {key:'manage_accounts', label:'إضافة/تعديل الحسابات والقيود اليدوية (بدون هذه، العرض يكون للقراءة فقط)'},
   {key:'view_expenses', label:'عرض المصروفات'},
+  {key:'view_all_expenses', label:'عرض مصروفات كل المستخدمين (بدون هذه، كل مستخدم يشوف مصروفاته هو بس)'},
   {key:'delete_invoices', label:'حذف فواتير البيع والشراء'},
   {key:'delete_records', label:'حذف المنتجات / العملاء / الموردين / الحسابات'},
   {key:'manage_users', label:'إدارة المستخدمين وصلاحياتهم'},
@@ -1041,8 +1117,8 @@ const PERM_LIST = [
   {key:'approve_consignment', label:'اعتماد أذونات بضاعة الأمانة والعينات/التسترز قبل ترحيلها للحسابات'},
   {key:'approve_expenses', label:'اعتماد المصروفات قبل ترحيلها للحسابات'},
 ];
-const DEFAULT_PERMS_ADMIN = {view_accounting:true, manage_accounts:true, view_expenses:true, delete_invoices:true, delete_records:true, manage_users:true, manage_settings:true, approve_consignment:true, approve_expenses:true};
-const DEFAULT_PERMS_EMPLOYEE = {view_accounting:false, manage_accounts:false, view_expenses:false, delete_invoices:false, delete_records:false, manage_users:false, manage_settings:false, approve_consignment:false, approve_expenses:false};
+const DEFAULT_PERMS_ADMIN = {view_accounting:true, manage_accounts:true, view_expenses:true, view_all_expenses:true, delete_invoices:true, delete_records:true, manage_users:true, manage_settings:true, approve_consignment:true, approve_expenses:true};
+const DEFAULT_PERMS_EMPLOYEE = {view_accounting:false, manage_accounts:false, view_expenses:false, view_all_expenses:false, delete_invoices:false, delete_records:false, manage_users:false, manage_settings:false, approve_consignment:false, approve_expenses:false};
 function currentPerms(){
   if(!isOnlineConfigured() || LOCAL_MODE) return DEFAULT_PERMS_ADMIN;
   if(!AUTH_SESSION) return DEFAULT_PERMS_EMPLOYEE;
@@ -1149,6 +1225,12 @@ function closeDropdown(){
   renderNav();
 }
 function navGroupHasActiveItem(items){ return items.some(it=>it.id===VIEW); }
+let navSubmenuOpen = null;
+function toggleNavSubmenu(itemId, event){
+  event.stopPropagation();
+  navSubmenuOpen = navSubmenuOpen===itemId ? null : itemId;
+  renderNav();
+}
 function renderNav(){
   const nav = document.getElementById('navlist');
   nav.innerHTML = NAV_GROUPS.map((g,gi)=>{
@@ -1167,7 +1249,21 @@ function renderNav(){
           <svg class="chev" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
         </div>
         <div class="topnav-dropdown">
-          ${items.map(item=>`<div class="dropdown-item ${VIEW===item.id?'active':''}" onclick="goTo('${item.id}'); closeDropdown();">${icon(item.icon)}<span>${t(item.id)}</span></div>`).join('')}
+          ${items.map(item=>{
+            if(item.submenu){
+              const subOpen = navSubmenuOpen===item.id;
+              return `
+                <div class="dropdown-item ${VIEW===item.id?'active':''}" onclick="toggleNavSubmenu('${item.id}', event)" style="justify-content:space-between;">
+                  <div style="display:flex;align-items:center;gap:10px;">${icon(item.icon)}<span>${t(item.id)}</span></div>
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;transform:rotate(${subOpen?'180':'0'}deg);transition:transform .15s;"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+                ${subOpen?`<div class="dropdown-submenu">
+                  ${item.submenu.map(sub=>`<div class="dropdown-item dropdown-subitem ${VIEW==='reports'&&reportTab===sub.id?'active':''}" onclick="reportTab='${sub.id}'; goTo('${item.id}'); closeDropdown();">${sub.label}</div>`).join('')}
+                </div>`:''}
+              `;
+            }
+            return `<div class="dropdown-item ${VIEW===item.id?'active':''}" onclick="goTo('${item.id}'); closeDropdown();">${icon(item.icon)}<span>${t(item.id)}</span></div>`;
+          }).join('')}
         </div>
       </div>`;
   }).join('');
@@ -1211,10 +1307,24 @@ function renderMobileNav(){
     if(items.length===0) return '';
     return `
       ${g.group?`<div class="mobile-nav-group-lbl">${t(g.group)}</div>`:''}
-      ${items.map(item=>`
+      ${items.map(item=>{
+        if(item.submenu){
+          const subOpen = navSubmenuOpen===item.id;
+          return `
+            <div class="mobile-navitem ${VIEW===item.id&&!subOpen?'active':''}" onclick="toggleNavSubmenu('${item.id}', event)" style="justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:12px;">${icon(item.icon)}<span>${t(item.id)}</span></div>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;transform:rotate(${subOpen?'180':'0'}deg);transition:transform .15s;"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            ${subOpen?`<div class="dropdown-submenu" style="margin-inline-start:16px;">
+              ${item.submenu.map(sub=>`<div class="mobile-navitem dropdown-subitem ${VIEW==='reports'&&reportTab===sub.id?'active':''}" onclick="reportTab='${sub.id}'; goTo('${item.id}');">${sub.label}</div>`).join('')}
+            </div>`:''}
+          `;
+        }
+        return `
         <div class="mobile-navitem ${VIEW===item.id?'active':''}" onclick="goTo('${item.id}')">
           ${icon(item.icon)}<span>${t(item.id)}</span>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     `;
   }).join('');
 }
@@ -2440,6 +2550,7 @@ function openSaleModal(editId){
     <div class="row2">
       <div class="field"><label>${lbl('العميل *','Customer *')}</label>
         <select id="f_party" onchange="onSalePartyChange()">${DB.customers.length? '<option value="">اختر عميل...</option>'+customersOpts : '<option value="">لا يوجد عملاء - أضف عميل أولاً</option>'}</select>
+        ${quickAddPartyHtml('customers')}
       </div>
       <div class="field"><label>${lbl('الفرع المستلم (اختياري)','Receiving Branch')}</label><select id="f_branch"><option value="">بدون فرع - العنوان الرئيسي</option></select></div>
     </div>
@@ -2730,7 +2841,7 @@ function openPurchaseOrderModal(editId){
   window._poProductOpts = productOpts;
   const body = `
     <div class="row2">
-      <div class="field"><label>المورد *</label><select id="f_party">${DB.suppliers.length?'<option value="">اختر...</option>'+suppliersOpts:'<option value="">لا يوجد موردون - أضف مورد أولاً</option>'}</select></div>
+      <div class="field"><label>المورد *</label><select id="f_party">${DB.suppliers.length?'<option value="">اختر...</option>'+suppliersOpts:'<option value="">لا يوجد موردون - أضف مورد أولاً</option>'}</select>${quickAddPartyHtml('suppliers')}</div>
       <div class="field"><label>تاريخ التسليم المتوقع</label><input id="f_expected" type="date"></div>
     </div>
     <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${o?o.date:todayISO()}"></div>
@@ -2855,6 +2966,7 @@ function openPurchaseModal(editId){
     <div class="row2">
       <div class="field"><label>${lbl('المورد *','Supplier *')}</label>
         <select id="f_party" onchange="onPurchasePartyChange()">${DB.suppliers.length? '<option value="">اختر مورد...</option>'+suppliersOpts : '<option value="">لا يوجد موردين - أضف مورد أولاً</option>'}</select>
+        ${quickAddPartyHtml('suppliers')}
       </div>
       <div class="field"><label>${lbl('التاريخ','Date')}</label><input id="f_date" type="date" value="${editInv?editInv.date:todayISO()}" oninput="onTermChange()"></div>
     </div>
@@ -3415,6 +3527,7 @@ function openQuotationModal(){
     <div class="row2">
       <div class="field"><label>${lbl('العميل *','Customer *')}</label>
         <select id="f_party">${DB.customers.length? '<option value="">اختر عميل...</option>'+customersOpts : '<option value="">لا يوجد عملاء - أضف عميل أولاً</option>'}</select>
+        ${quickAddPartyHtml('customers')}
       </div>
       <div class="field"><label>${lbl('صالح حتى','Valid Until')}</label><input id="f_valid" type="date" value="${addDays(todayISO(),14)}"></div>
     </div>
@@ -3677,10 +3790,11 @@ function renderConsignShipments(){
         const value = s.items.reduce((sum,it)=>sum+it.qty*(it.cost||0),0);
         const status = s.status||'approved';
         const statusBadge = status==='pending' ? '<span class="badge partial">بانتظار الموافقة</span>' : status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : '<span class="badge paid">معتمد</span>';
+        const dupCount = status==='approved' ? DB.journal.filter(j=>j.sourceId===s.id && j.sourceType==='consign_shipment').length : 1;
         return `<tr>
           <td>${s.number}</td>
           <td>${s.type==='return'?'<span class="badge partial">مرتجع</span>':'<span class="badge ok">صرف</span>'}</td>
-          <td>${statusBadge}</td>
+          <td>${statusBadge}${dupCount>1?' <span class="badge unpaid" title="تم رصد قيود مكررة">⚠ مكرر ×'+dupCount+'</span>':''}</td>
           <td>${esc(s.customerName)}</td><td>${s.branchName?esc(s.branchName):'-'}</td><td>${fmtDate(s.date)}</td><td>${s.items.length}</td>
           <td class="tnum">${money(value)}</td>
           <td>
@@ -3690,6 +3804,7 @@ function renderConsignShipments(){
               <button class="btn btn-outline btn-icon btn-sm" onclick="editConsignShipment('${s.id}')" title="تعديل">${icon('edit')}</button>
               ${can('approve_consignment')?`<button class="btn btn-primary btn-sm" onclick="approveConsignShipment('${s.id}')">${icon('plus')} اعتماد</button><button class="btn btn-danger-o btn-sm" onclick="rejectConsignShipment('${s.id}')">رفض</button>`:''}
             `:''}
+            ${(dupCount>1 && can('manage_accounts'))?`<button class="btn btn-primary btn-sm" onclick="fixDuplicateApproval('${s.id}')">${icon('scale')} إصلاح المكرر</button>`:''}
             ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteConsignShipment('${s.id}')" title="حذف">${icon('trash')}</button>`:''}
           </td>
         </tr>`;
@@ -3831,6 +3946,8 @@ function approveConsignShipment(id){
     }
   }
   confirmAction('اعتماد '+(isReturn?'المرتجع':'إذن الصرف'), 'سيتم تحريك المخزون وترحيل القيد المحاسبي فوراً. هل أنت متأكد؟', ()=>{
+    ship.status = 'approved'; ship.approvedBy = currentUserName(); ship.approvedAt = Date.now();
+    persist('consignShipments');
     ship.items.forEach(it=>{
       const p = productById(it.productId);
       p.quantity += isReturn ? it.qty : -it.qty;
@@ -3851,8 +3968,6 @@ function approveConsignShipment(id){
         ], 'consign_shipment', ship.id);
       }
     }
-    ship.status = 'approved'; ship.approvedBy = currentUserName(); ship.approvedAt = Date.now();
-    persist('consignShipments');
     logActivity('consignment', 'اعتماد '+(isReturn?'مرتجع بضاعة أمانة ':'إذن صرف بضاعة أمانة ')+ship.number+' - '+ship.customerName);
     closeModal(); render(); toast('تم الاعتماد والترحيل بنجاح');
   });
@@ -3867,6 +3982,35 @@ function rejectConsignShipment(id){
     logActivity('consignment', 'رفض إذن بضاعة أمانة '+ship.number+' - '+ship.customerName);
     closeModal(); render(); toast('تم الرفض');
   });
+}
+function fixDuplicateApproval(id){
+  if(!requirePerm('manage_accounts','إصلاح اعتماد مكرر')) return;
+  const ship = DB.consignShipments.find(x=>x.id===id);
+  if(!ship){ toast('الإذن غير موجود'); return; }
+  const dupJournals = DB.journal.filter(j=>j.sourceId===ship.id && j.sourceType==='consign_shipment');
+  if(dupJournals.length<2){ toast('مفيش تكرار مكتشف لهذا الإذن - القيود المرتبطة بيه عدد '+dupJournals.length+' بس'); return; }
+  const isReturn = ship.type==='return';
+  const extraCount = dupJournals.length - 1;
+  const itemsList = ship.items.map(it=>'• '+it.name+': '+fmt(it.qty*extraCount)+' وحدة').join('\n');
+  confirmAction('إصلاح اعتماد مكرر - '+ship.number,
+    'لقينا '+dupJournals.length+' قيود مكررة لنفس الإذن (المفروض قيد واحد بس). هيتم:\n- حذف '+extraCount+' من القيود الزيادة (والإبقاء على واحد)\n- تصحيح كمية المخزون للمنتجات دي:\n'+itemsList+'\nهل أنت متأكد؟',
+    ()=>{
+      for(let i=0;i<extraCount;i++){
+        const j = dupJournals[i];
+        DB.journal = DB.journal.filter(x=>x.id!==j.id);
+      }
+      persist('journal');
+      ship.items.forEach(it=>{
+        const p = productById(it.productId);
+        if(!p) return;
+        const correction = it.qty * extraCount;
+        p.quantity += isReturn ? -correction : correction;
+        logStockMove(it.productId, isReturn?-correction:correction, 'duplicate_fix', ship.number, 'تصحيح اعتماد مكرر لإذن بضاعة أمانة');
+      });
+      persist('products');
+      logActivity('consignment', 'إصلاح اعتماد مكرر لإذن '+ship.number+' - حذف '+extraCount+' قيد زيادة وتصحيح المخزون');
+      closeModal(); render(); toast('تم الإصلاح بنجاح - راجع الأرقام للتأكد');
+    });
 }
 function deleteConsignShipment(id){
   if(!requirePerm('delete_invoices','حذف أذونات بضاعة الأمانة')) return;
@@ -4046,6 +4190,8 @@ function approveTesterHandout(id){
     if(p && it.qty>p.quantity+0.001){ toast('لا يمكن الاعتماد: الكمية المطلوبة من "'+it.name+'" أكبر من المتاح بالمخزون حالياً ('+fmt(p.quantity)+')'); return; }
   }
   confirmAction('اعتماد التوزيع', 'سيتم تحريك المخزون وترحيل قيد المصروف فوراً. هل أنت متأكد؟', ()=>{
+    th.status = 'approved'; th.approvedBy = currentUserName(); th.approvedAt = Date.now();
+    persist('testerHandouts');
     th.items.forEach(it=>{
       const p = productById(it.productId);
       p.quantity -= it.qty;
@@ -4059,8 +4205,6 @@ function approveTesterHandout(id){
         {accountId:'acc_inventory', debit:0, credit:value},
       ], 'tester_handout', th.id);
     }
-    th.status = 'approved'; th.approvedBy = currentUserName(); th.approvedAt = Date.now();
-    persist('testerHandouts');
     logActivity('samples', 'اعتماد توزيع عينات/تسترز '+th.number+' بقيمة '+money(value));
     closeModal(); render(); toast('تم الاعتماد والترحيل بنجاح');
   });
@@ -4425,21 +4569,7 @@ function inRange(dateStr){
   return true;
 }
 function renderReports(){
-  const tabs = [
-    {id:'sales', label:'تقرير المبيعات'},
-    {id:'purchases', label:'تقرير المشتريات'},
-    {id:'returns', label:'المرتجعات'},
-    {id:'vat', label:'تقرير الضريبة'},
-    {id:'inventory', label:'تقييم المخزون'},
-    {id:'top', label:'الأكثر مبيعاً'},
-    {id:'balances', label:'أرصدة العملاء والموردين'},
-    {id:'aging', label:'أعمار الديون'},
-    {id:'commissions', label:'عمولات المندوبين'},
-    {id:'trial', label:'ميزان المراجعة'},
-    {id:'ledger', label:'كشف حساب'},
-    {id:'income', label:'قائمة الدخل'},
-    {id:'balancesheet', label:'الميزانية العمومية'},
-  ];
+  const tabs = REPORT_TYPES;
   let body = '';
   if(reportTab==='sales') body = reportSales();
   else if(reportTab==='purchases') body = reportPurchases();
@@ -4457,7 +4587,12 @@ function renderReports(){
 
   return `
     <div class="card">
-      <div class="tabs">${tabs.map(t=>`<div class="tab ${reportTab===t.id?'active':''}" onclick="reportTab='${t.id}'; render();">${t.label}</div>`).join('')}</div>
+      <div class="field" style="max-width:340px;">
+        <label>نوع التقرير</label>
+        <select onchange="reportTab=this.value; render();">
+          ${tabs.map(t=>`<option value="${t.id}" ${reportTab===t.id?'selected':''}>${t.label}</option>`).join('')}
+        </select>
+      </div>
       <div class="row2" style="max-width:420px;margin-bottom:16px;">
         <div class="field"><label>من تاريخ</label><input type="date" value="${repFrom}" oninput="repFrom=this.value; render();"></div>
         <div class="field"><label>إلى تاريخ</label><input type="date" value="${repTo}" oninput="repTo=this.value; render();"></div>
@@ -4577,13 +4712,16 @@ function approveSelectedExpenses(){
   confirmAction('اعتماد '+ids.length+' مصروف', 'سيتم ترحيل القيود المحاسبية لكل المصروفات المحددة فوراً. هل أنت متأكد؟', ()=>{
     ids.forEach(id=>{
       const exp = DB.expenses.find(x=>x.id===id);
+      exp.status = 'approved'; exp.approvedBy = currentUserName(); exp.approvedAt = Date.now();
+    });
+    persist('expenses');
+    ids.forEach(id=>{
+      const exp = DB.expenses.find(x=>x.id===id);
       postJournal(exp.date, exp.memo, [
         {accountId:exp.accountId, debit:exp.amount, credit:0},
         {accountId:exp.cashAccountId, debit:0, credit:exp.amount},
       ], 'expense', exp.id);
-      exp.status = 'approved'; exp.approvedBy = currentUserName(); exp.approvedAt = Date.now();
     });
-    persist('expenses');
     logActivity('expense_approve', 'اعتماد جماعي لـ '+ids.length+' مصروف');
     selectedExpenses.clear();
     closeModal(); render(); toast('تم اعتماد '+ids.length+' مصروف بنجاح');
@@ -4606,9 +4744,10 @@ function deleteSelectedExpenses(){
   });
 }
 function exportExpenses(){
+  const list = can('view_all_expenses') ? DB.expenses : DB.expenses.filter(e=>e.createdBy===currentUserName());
   exportCSV('expenses-'+todayISO()+'.csv',
     ['الرقم','الحساب','المبلغ','التاريخ','البيان','الحالة'],
-    DB.expenses.map(e=>{
+    list.map(e=>{
       const acc = accountById(e.accountId);
       const statusAr = (e.status||'approved')==='pending'?'بانتظار الموافقة':(e.status==='rejected'?'مرفوض':'معتمد');
       return [e.number||'', acc?acc.name:'', e.amount||0, e.date||'', e.memo||'', statusAr];
@@ -5276,7 +5415,7 @@ function renderJournalPage(){
             <td class="tnum">${money(totalDr)}</td>
             <td>
               <button class="btn btn-outline btn-sm" onclick="viewJournalEntry('${j.id}')">عرض</button>
-              ${isManual?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteManualJournal('${j.id}')">${icon('trash')}</button>`:''}
+              ${isManual?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteManualJournal('${j.id}')">${icon('trash')}</button>`:(can('manage_accounts')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteJournalEntryDirect('${j.id}')" title="حذف تصحيحي - لا يعكس المخزون تلقائياً">${icon('trash')}</button>`:'')}
             </td>
           </tr>`;
         }).join('')}</tbody>
@@ -5313,6 +5452,18 @@ function viewJournalEntry(id){
     </div>
   `;
 }
+function deleteJournalEntryDirect(id){
+  if(!requirePerm('manage_accounts','حذف قيد تصحيحي')) return;
+  const j = DB.journal.find(x=>x.id===id);
+  if(!j) return;
+  if(!checkPeriodLock(j.date)) return;
+  confirmAction('حذف تصحيحي للقيد', 'ده حذف مباشر للقيد المحاسبي بس، من غير ما يعكس أي تأثير على المخزون أو حالة المستند الأصلي (الفاتورة/الإذن) تلقائياً. استخدمها بس لتصحيح قيد مكرر بالغلط، وتأكد إنك ظبطت المخزون يدوياً لو محتاج. هل أنت متأكد؟', ()=>{
+    DB.journal = DB.journal.filter(x=>x.id!==id);
+    persist('journal');
+    logActivity('journal_delete', 'حذف تصحيحي لقيد '+(j.memo||id));
+    closeModal(); render(); toast('تم حذف القيد');
+  });
+}
 function deleteManualJournal(id){
   const j = DB.journal.find(x=>x.id===id);
   if(j && j.sourceType==='expense' && j.sourceId){
@@ -5329,7 +5480,8 @@ function deleteManualJournal(id){
 function openExpenseModal(editId){
   const editExp = editId ? DB.expenses.find(x=>x.id===editId) : null;
   if(editExp && (editExp.status||'approved')==='approved'){ toast('المصروف ده معتمد بالفعل ومترحّل في الحسابات - لا يمكن تعديله'); return; }
-  const expAccs = DB.accounts.filter(a=>a.type==='expense' && (a.id==='acc_expense' || a.id==='acc_opex' || a.code==='5600'));
+  if(editExp && editExp.createdBy!==currentUserName() && !can('view_all_expenses')){ toast('مش عندك صلاحية تعديل مصروفات مستخدمين تانيين'); return; }
+  const expAccs = DB.accounts.filter(a=>a.type==='expense' && (a.id==='acc_expense' || a.id==='acc_opex' || a.id==='acc_mkt_commission' || a.code==='5600'));
   const body = `
     <div class="alert-bar">${icon('alert')}<div>المصروف ده هيتسجل <b>بانتظار الموافقة</b> ومش هيترحّل في الحسابات إلا بعد اعتماده.</div></div>
     <div class="field"><label>حساب المصروف</label>
@@ -5408,12 +5560,12 @@ function approveExpense(id){
   if(!exp || exp.status!=='pending') return;
   if(!checkPeriodLock(exp.date)) return;
   confirmAction('اعتماد المصروف', 'سيتم ترحيل القيد المحاسبي فوراً. هل أنت متأكد؟', ()=>{
+    exp.status = 'approved'; exp.approvedBy = currentUserName(); exp.approvedAt = Date.now();
+    persist('expenses');
     postJournal(exp.date, exp.memo, [
       {accountId:exp.accountId, debit:exp.amount, credit:0},
       {accountId:exp.cashAccountId, debit:0, credit:exp.amount},
     ], 'expense', exp.id);
-    exp.status = 'approved'; exp.approvedBy = currentUserName(); exp.approvedAt = Date.now();
-    persist('expenses');
     logActivity('expense_approve', 'اعتماد مصروف: '+exp.memo+' بمبلغ '+money(exp.amount));
     closeModal(); render(); toast('تم الاعتماد والترحيل بنجاح');
   });
@@ -5446,23 +5598,32 @@ function deleteExpense(id){
 }
 
 /* ============ EXPENSES MODULE ============ */
-let expFilter = '', expFrom = '', expTo = '';
+let expFilter = '', expFrom = '', expTo = '', expUserFilter = '';
 let selectedExpenses = new Set();
 function renderExpensesPage(){
   let entries = [...DB.expenses];
+  if(!can('view_all_expenses')) entries = entries.filter(e=>e.createdBy===currentUserName());
+  const employeeList = [...new Set(DB.expenses.map(e=>e.createdBy).filter(Boolean))].sort();
+  if(can('view_all_expenses') && expUserFilter) entries = entries.filter(e=>e.createdBy===expUserFilter);
   if(expFrom) entries = entries.filter(e=>e.date>=expFrom);
   if(expTo) entries = entries.filter(e=>e.date<=expTo);
   if(expFilter) entries = entries.filter(e=>e.memo.toLowerCase().includes(expFilter.toLowerCase()));
-  entries = entries.sort((a,b)=>b.createdAt-a.createdAt);
+  entries = entries.sort((a,b)=>{
+    const aPending = a.status==='pending' ? 0 : 1;
+    const bPending = b.status==='pending' ? 0 : 1;
+    if(aPending!==bPending) return aPending-bPending;
+    return b.createdAt-a.createdAt;
+  });
   const approvedEntries = entries.filter(e=>(e.status||'approved')==='approved');
-  const pendingCount = DB.expenses.filter(e=>e.status==='pending').length;
+  const pendingCount = entries.filter(e=>e.status==='pending').length;
   const totalAll = approvedEntries.reduce((s,e)=>s+e.amount,0);
   const thisMonthKey = todayISO().slice(0,7);
-  const thisMonthTotal = DB.expenses.filter(e=>(e.status||'approved')==='approved' && e.date.slice(0,7)===thisMonthKey).reduce((s,e)=>s+e.amount,0);
+  const thisMonthTotal = entries.filter(e=>(e.status||'approved')==='approved' && e.date.slice(0,7)===thisMonthKey).reduce((s,e)=>s+e.amount,0);
   const visibleIds = entries.map(e=>e.id);
   const allSelected = visibleIds.length>0 && visibleIds.every(id=>selectedExpenses.has(id));
   const selectedPendingCount = [...selectedExpenses].filter(id=>{ const e=DB.expenses.find(x=>x.id===id); return e && e.status==='pending'; }).length;
   return `
+    ${!can('view_all_expenses')?`<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px 0;">${icon('alert')} إنت بتشوف مصروفاتك انت بس. محتاج صلاحية "عرض مصروفات كل المستخدمين" عشان تشوف مصروفات باقي الفريق.</p>`:''}
     <div class="stat-grid">
       <div class="stat-card red"><div class="lbl">${icon('expense')} إجمالي المصروفات المعتمدة (حسب الفلتر)</div><div class="val">${money(totalAll)}</div></div>
       <div class="stat-card"><div class="lbl">مصروفات هذا الشهر (معتمدة)</div><div class="val">${money(thisMonthTotal)}</div></div>
@@ -5480,6 +5641,10 @@ function renderExpensesPage(){
       </div>
       <div class="search-bar">
         <input placeholder="بحث بالبيان..." value="${esc(expFilter)}" oninput="expFilter=this.value; render();">
+        ${can('view_all_expenses')?`<select onchange="expUserFilter=this.value; render();" style="max-width:200px;">
+          <option value="">كل الموظفين</option>
+          ${employeeList.map(u=>`<option value="${esc(u)}" ${expUserFilter===u?'selected':''}>${esc(u)}</option>`).join('')}
+        </select>`:''}
         <input type="date" value="${expFrom}" oninput="expFrom=this.value; render();" title="من تاريخ">
         <input type="date" value="${expTo}" oninput="expTo=this.value; render();" title="إلى تاريخ">
       </div>
@@ -6154,7 +6319,18 @@ function openModal(title, bodyHtml, onSave){
       </div>
     </div>
   `;
-  document.getElementById('modalSaveBtn').onclick = ()=>{ onSave(); };
+  document.getElementById('modalSaveBtn').onclick = ()=>{
+    const btn = document.getElementById('modalSaveBtn');
+    if(btn.disabled) return;
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = t('saving')||'...';
+    const result = onSave();
+    if(result===false){
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  };
   window._confirmCallback = null;
 }
 function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
@@ -6172,7 +6348,12 @@ function confirmAction(title, msg, onYes){
       </div>
     </div>
   `;
-  document.getElementById('confirmYesBtn').onclick = onYes;
+  document.getElementById('confirmYesBtn').onclick = ()=>{
+    const btn = document.getElementById('confirmYesBtn');
+    if(btn.disabled) return;
+    btn.disabled = true;
+    onYes();
+  };
 }
 
 /* ============ INIT ============ */

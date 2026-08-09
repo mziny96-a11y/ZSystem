@@ -580,6 +580,7 @@ const T = {
   accounts:{ar:'دليل الحسابات',en:'Chart of Accounts'}, accounts_sub:{ar:'شجرة الحسابات المحاسبية وأرصدتها',en:'Accounting structure and balances'},
   journal:{ar:'القيود اليومية',en:'Journal'}, journal_sub:{ar:'دفتر اليومية وحركة القيود المحاسبية',en:'Journal entries and postings'},
   reports:{ar:'التقارير',en:'Reports'}, reports_sub:{ar:'تقارير المبيعات والمشتريات والأرباح',en:'Sales, purchases, and profit reports'},
+  salesreports:{ar:'تقارير المبيعات',en:'Sales Reports'}, salesreports_sub:{ar:'كل التقارير التفصيلية الخاصة بالمبيعات',en:'All detailed sales-specific reports'},
   activity:{ar:'سجل الحركات',en:'Activity Log'}, activity_sub:{ar:'سجل بكل العمليات ومن قام بها',en:'Log of all actions and who performed them'},
   settings:{ar:'الإعدادات',en:'Settings'}, settings_sub:{ar:'بيانات الشركة والإعدادات العامة',en:'Company info and general settings'},
   save:{ar:'حفظ',en:'Save'}, cancel:{ar:'إلغاء',en:'Cancel'}, confirmDelete:{ar:'تأكيد الحذف',en:'Confirm Delete'},
@@ -651,9 +652,17 @@ const REPORT_TYPES = [
   {id:'aging', label:'أعمار الديون'},
   {id:'commissions', label:'عمولات المندوبين'},
   {id:'trial', label:'ميزان المراجعة'},
-  {id:'ledger', label:'كشف حساب'},
+  {id:'ledger', label:'كشف حساب (حساب من الدليل)'},
+  {id:'customerledger', label:'كشف حساب عميل'},
+  {id:'supplierledger', label:'كشف حساب مورد'},
   {id:'income', label:'قائمة الدخل'},
   {id:'balancesheet', label:'الميزانية العمومية'},
+];
+const SALES_REPORT_TYPES = [
+  {id:'monthly', label:'الاتجاه الشهري'},
+  {id:'topsellers', label:'الأكثر مبيعاً'},
+  {id:'salesreps', label:'عمولات المندوبين'},
+  {id:'forecast', label:'توقع مبيعات الشهور القادمة'},
 ];
 const NAV_GROUPS = [
   {group:null, items:[
@@ -663,12 +672,13 @@ const NAV_GROUPS = [
     {id:'treasury', icon:'bank'},
     {id:'accounts', icon:'book'},
     {id:'journal', icon:'journal'},
-    {id:'reports', icon:'reports', submenu:REPORT_TYPES},
+    {id:'reports', icon:'reports', submenu:REPORT_TYPES, tabVar:'reportTab'},
   ]},
   {group:'grp_sales', items:[
     {id:'crm', icon:'customers'},
     {id:'quotations', icon:'journal'},
     {id:'sales', icon:'sales'},
+    {id:'salesreports', icon:'reports', submenu:SALES_REPORT_TYPES, tabVar:'salesReportTab'},
     {id:'consignment', icon:'consign'},
     {id:'customers', icon:'customers'},
   ]},
@@ -1231,6 +1241,17 @@ function toggleNavSubmenu(itemId, event){
   navSubmenuOpen = navSubmenuOpen===itemId ? null : itemId;
   renderNav();
 }
+function navigateToSubTab(viewId, tabVar, subId){
+  if(tabVar==='reportTab') reportTab = subId;
+  else if(tabVar==='salesReportTab') salesReportTab = subId;
+  goTo(viewId);
+  closeDropdown();
+}
+function getSubTabValue(tabVar){
+  if(tabVar==='reportTab') return reportTab;
+  if(tabVar==='salesReportTab') return salesReportTab;
+  return null;
+}
 function renderNav(){
   const nav = document.getElementById('navlist');
   nav.innerHTML = NAV_GROUPS.map((g,gi)=>{
@@ -1258,7 +1279,7 @@ function renderNav(){
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;transform:rotate(${subOpen?'180':'0'}deg);transition:transform .15s;"><path d="M6 9l6 6 6-6"/></svg>
                 </div>
                 ${subOpen?`<div class="dropdown-submenu">
-                  ${item.submenu.map(sub=>`<div class="dropdown-item dropdown-subitem ${VIEW==='reports'&&reportTab===sub.id?'active':''}" onclick="reportTab='${sub.id}'; goTo('${item.id}'); closeDropdown();">${sub.label}</div>`).join('')}
+                  ${item.submenu.map(sub=>`<div class="dropdown-item dropdown-subitem ${VIEW===item.id&&getSubTabValue(item.tabVar)===sub.id?'active':''}" onclick="navigateToSubTab('${item.id}','${item.tabVar}','${sub.id}')">${sub.label}</div>`).join('')}
                 </div>`:''}
               `;
             }
@@ -1316,7 +1337,7 @@ function renderMobileNav(){
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;transform:rotate(${subOpen?'180':'0'}deg);transition:transform .15s;"><path d="M6 9l6 6 6-6"/></svg>
             </div>
             ${subOpen?`<div class="dropdown-submenu" style="margin-inline-start:16px;">
-              ${item.submenu.map(sub=>`<div class="mobile-navitem dropdown-subitem ${VIEW==='reports'&&reportTab===sub.id?'active':''}" onclick="reportTab='${sub.id}'; goTo('${item.id}');">${sub.label}</div>`).join('')}
+              ${item.submenu.map(sub=>`<div class="mobile-navitem dropdown-subitem ${VIEW===item.id&&getSubTabValue(item.tabVar)===sub.id?'active':''}" onclick="navigateToSubTab('${item.id}','${item.tabVar}','${sub.id}')">${sub.label}</div>`).join('')}
             </div>`:''}
           `;
         }
@@ -1380,6 +1401,103 @@ function deleteSalesRep(id){
     persist('salesReps');
     closeModal(); openSalesRepsModal(); toast('تم الحذف');
   });
+}
+/* ============ SALES REPORTS HUB ============ */
+function renderSalesReportsPage(){
+  let body = '';
+  if(salesReportTab==='monthly') body = reportMonthlyTrend();
+  else if(salesReportTab==='topsellers') body = reportTop();
+  else if(salesReportTab==='salesreps') body = reportCommissions();
+  else if(salesReportTab==='forecast') body = reportSalesForecast();
+  return `
+    <div class="card">
+      <div class="field" style="max-width:340px;">
+        <label>نوع التقرير</label>
+        <select onchange="salesReportTab=this.value; render();">
+          ${SALES_REPORT_TYPES.map(t=>`<option value="${t.id}" ${salesReportTab===t.id?'selected':''}>${t.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row2" style="max-width:420px;margin-bottom:16px;">
+        <div class="field"><label>من تاريخ</label><input type="date" value="${repFrom}" oninput="repFrom=this.value; render();"></div>
+        <div class="field"><label>إلى تاريخ</label><input type="date" value="${repTo}" oninput="repTo=this.value; render();"></div>
+      </div>
+      ${body}
+    </div>
+  `;
+}
+function reportMonthlyTrend(){
+  const list = DB.sales.filter(s=>inRange(s.date));
+  if(list.length===0) return emptyState('لا توجد بيانات', 'لا توجد فواتير مبيعات ضمن الفترة المحددة');
+  const byMonth = {};
+  list.forEach(s=>{
+    const key = s.date.slice(0,7);
+    if(!byMonth[key]) byMonth[key] = {count:0, total:0};
+    byMonth[key].count++;
+    byMonth[key].total += s.total;
+  });
+  const months = Object.keys(byMonth).sort();
+  const maxVal = Math.max(...months.map(m=>byMonth[m].total), 1);
+  return `
+    <div class="table-wrap"><table>
+      <thead><tr><th>الشهر</th><th>عدد الفواتير</th><th>الإجمالي</th><th></th></tr></thead>
+      <tbody>${months.map(m=>`<tr>
+        <td>${m}</td><td class="tnum">${byMonth[m].count}</td><td class="tnum">${money(byMonth[m].total)}</td>
+        <td style="width:200px;"><div style="background:var(--gold);height:10px;border-radius:5px;width:${(byMonth[m].total/maxVal*100).toFixed(0)}%;"></div></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+function reportSalesForecast(){
+  const byMonth = {};
+  DB.sales.forEach(s=>{
+    const key = s.date.slice(0,7);
+    byMonth[key] = (byMonth[key]||0) + s.total;
+  });
+  const months = Object.keys(byMonth).sort();
+  if(months.length<2){
+    return emptyState('بيانات غير كافية للتوقع','محتاج على الأقل شهرين من المبيعات الفعلية عشان نقدر نحسب اتجاه موثوق');
+  }
+  const recentMonths = months.slice(-12);
+  const n = recentMonths.length;
+  const xs = recentMonths.map((_,i)=>i);
+  const ys = recentMonths.map(m=>byMonth[m]);
+  const sumX = xs.reduce((a,b)=>a+b,0);
+  const sumY = ys.reduce((a,b)=>a+b,0);
+  const sumXY = xs.reduce((s,x,i)=>s+x*ys[i],0);
+  const sumX2 = xs.reduce((s,x)=>s+x*x,0);
+  const denom = (n*sumX2 - sumX*sumX);
+  const slope = denom!==0 ? (n*sumXY - sumX*sumY)/denom : 0;
+  const intercept = (sumY - slope*sumX)/n;
+  const lastMonthKey = recentMonths[recentMonths.length-1];
+  const [ly, lm] = lastMonthKey.split('-').map(Number);
+  const forecasts = [];
+  for(let i=1;i<=3;i++){
+    const x = n-1+i;
+    let val = slope*x + intercept;
+    if(val<0) val = 0;
+    let fy = ly, fm = lm+i;
+    while(fm>12){ fm-=12; fy++; }
+    forecasts.push({month: fy+'-'+String(fm).padStart(2,'0'), value: val});
+  }
+  const avgRecent = ys.slice(-3).reduce((a,b)=>a+b,0) / Math.min(3, ys.length);
+  const trendLabel = slope>0.02*Math.max(avgRecent,1) ? 'اتجاه تصاعدي 📈' : (slope<-0.02*Math.max(avgRecent,1) ? 'اتجاه تنازلي 📉' : 'مستقر تقريباً ➡️');
+  return `
+    <div class="stat-grid" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="lbl">الاتجاه العام</div><div class="val" style="font-size:16px;">${trendLabel}</div></div>
+      <div class="stat-card gold"><div class="lbl">متوسط آخر 3 شهور فعلية</div><div class="val">${money(avgRecent)}</div></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);">التوقع مبني على تحليل الاتجاه الخطي لآخر ${n} شهر من مبيعاتك الفعلية. ده تقدير تقريبي للمساعدة في التخطيط، مش رقم مؤكد — كل ما بياناتك التاريخية أكتر، كل ما التوقع يبقى أدق.</p>
+    <h3 style="font-size:14.5px;color:var(--primary-dark);margin-top:16px;">البيانات الفعلية (آخر ${n} شهر)</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>الشهر</th><th>المبيعات الفعلية</th></tr></thead>
+      <tbody>${recentMonths.map(m=>`<tr><td>${m}</td><td class="tnum">${money(byMonth[m])}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <h3 style="font-size:14.5px;color:var(--gold);margin-top:16px;">${icon('alert')} التوقع للشهور القادمة (تقديري)</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>الشهر</th><th>المبيعات المتوقعة</th></tr></thead>
+      <tbody>${forecasts.map(f=>`<tr><td>${f.month}</td><td class="tnum" style="font-weight:700;color:#8A6220;">${money(f.value)}</td></tr>`).join('')}</tbody>
+    </table></div>
+  `;
 }
 function reportCommissions(){
   const invs = DB.sales.filter(s=>s.salesRepId && (!repFrom || s.date>=repFrom) && (!repTo || s.date<=repTo));
@@ -1469,7 +1587,7 @@ function render(){
     dashboard: renderDashboard, sales: renderSales, purchases: renderPurchases,
     inventory: renderInventory, customers: ()=>renderParty('customers'),
     suppliers: ()=>renderParty('suppliers'), accounts: renderAccounts, journal: renderJournalPage,
-    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage
+    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage
   };
   c.innerHTML = (map[VIEW]||renderDashboard)();
 }
@@ -4562,6 +4680,7 @@ function renderPurchases(){
 
 /* ============ REPORTS ============ */
 let reportTab = 'sales';
+let salesReportTab = 'overview';
 let repFrom = '', repTo = '';
 function inRange(dateStr){
   if(repFrom && dateStr < repFrom) return false;
@@ -4582,6 +4701,8 @@ function renderReports(){
   else if(reportTab==='top') body = reportTop();
   else if(reportTab==='trial') body = reportTrialBalance();
   else if(reportTab==='ledger') body = reportLedger();
+  else if(reportTab==='customerledger') body = reportPartyLedger('customers');
+  else if(reportTab==='supplierledger') body = reportPartyLedger('suppliers');
   else if(reportTab==='income') body = reportIncomeStatement();
   else if(reportTab==='balancesheet') body = reportBalanceSheet();
 
@@ -5106,6 +5227,7 @@ function reportTrialBalance(){
   `;
 }
 let ledgerAccountId = '';
+let ledgerPartyId = {customers:'', suppliers:''};
 function reportLedger(){
   if(DB.accounts.length===0) return emptyState('لا توجد حسابات','أضف حسابات من دليل الحسابات');
   if(!ledgerAccountId) ledgerAccountId = DB.accounts[0].id;
@@ -5127,6 +5249,44 @@ function reportLedger(){
       </select>
     </div>
     ${lines.length===0? emptyState('لا توجد حركات','لا توجد قيود على هذا الحساب ضمن الفترة المحددة') : `
+    <div class="table-wrap"><table>
+      <thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>`}
+  `;
+}
+function reportPartyLedger(kind){
+  const isCust = kind==='customers';
+  const partyList = DB[kind];
+  if(partyList.length===0) return emptyState('لا توجد بيانات', isCust?'لا يوجد عملاء مسجلين':'لا يوجد موردين مسجلين');
+  if(!ledgerPartyId[kind] && partyList.length>0) ledgerPartyId[kind] = partyList[0].id;
+  const selectedId = ledgerPartyId[kind];
+  const party = partyList.find(p=>p.id===selectedId);
+  const lines = [];
+  DB.journal.filter(j=> (!repFrom || j.date>=repFrom) && (!repTo || j.date<=repTo)).sort((a,b)=> a.date<b.date?-1:1).forEach(j=>{
+    j.lines.forEach(l=>{
+      if(l.partyId===selectedId && l.partyType===(isCust?'customer':'supplier')){
+        lines.push({date:j.date, memo:j.memo, debit:l.debit||0, credit:l.credit||0});
+      }
+    });
+  });
+  let running = 0;
+  const isDebitNormal = isCust; // AR is asset (debit-normal), AP is liability (credit-normal)
+  const rowsHtml = lines.map(l=>{
+    running += isDebitNormal ? (l.debit-l.credit) : (l.credit-l.debit);
+    return `<tr><td>${fmtDate(l.date)}</td><td>${esc(l.memo)}</td><td class="tnum">${l.debit?money(l.debit):'-'}</td><td class="tnum">${l.credit?money(l.credit):'-'}</td><td class="tnum" style="font-weight:700;">${money(running)}</td></tr>`;
+  }).join('');
+  return `
+    <div class="field" style="max-width:340px;"><label>${isCust?'اختر العميل':'اختر المورد'}</label>
+      <select onchange="ledgerPartyId['${kind}']=this.value; render();">
+        ${partyList.map(p=>`<option value="${p.id}" ${p.id===selectedId?'selected':''}>${esc(p.name)}</option>`).join('')}
+      </select>
+    </div>
+    ${party?`<div class="stat-grid" style="margin:14px 0;">
+      <div class="stat-card ${isDebitNormal?'green':'red'}"><div class="lbl">الرصيد ${isCust?'المستحق (له)':'المستحق (عليه)'}</div><div class="val">${money(Math.abs(running))}</div></div>
+      <div class="stat-card"><div class="lbl">عدد الحركات ضمن الفترة</div><div class="val">${lines.length}</div></div>
+    </div>`:''}
+    ${lines.length===0? emptyState('لا توجد حركات','لا توجد قيود على هذا '+(isCust?'العميل':'المورد')+' ضمن الفترة المحددة') : `
     <div class="table-wrap"><table>
       <thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
       <tbody>${rowsHtml}</tbody>

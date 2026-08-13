@@ -590,7 +590,7 @@ const ICON = {
 function icon(name){return ICON[name]||'';}
 
 /* ============ STATE ============ */
-let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], productGroups:[], crmActivities:[], purchaseOrders:[], warehouses:[], salesReps:[], custodies:[], custodyEntries:[], boms:[], productionOrders:[], landedCosts:[], comments:[], accounts:[], journal:[], activityLog:[], settings:{ companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 } };
+let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], productGroups:[], crmActivities:[], purchaseOrders:[], warehouses:[], salesReps:[], custodies:[], custodyEntries:[], boms:[], productionOrders:[], landedCosts:[], comments:[], accounts:[], journal:[], activityLog:[], priceLists:[], settings:{ companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 } };
 let VIEW = 'dashboard';
 
 /* ============ LANGUAGE (عربي / English) ============ */
@@ -643,6 +643,8 @@ const T = {
   boms:{ar:'وصفات التصنيع',en:'Bill of Materials'}, boms_sub:{ar:'مكوّنات كل منتج مصنّع',en:'Components of each manufactured product'},
   production:{ar:'أوامر التصنيع',en:'Production Orders'}, production_sub:{ar:'تحويل مواد خام لمنتجات جاهزة',en:'Convert raw materials into finished products'},
   landedcosts:{ar:'الشحن والتكاليف الإضافية',en:'Shipping & Landed Costs'}, landedcosts_sub:{ar:'توزيع تكلفة الشحن على المنتجات',en:'Allocate shipping cost onto products'},
+  purchasereceiving:{ar:'استلام المشتريات',en:'Purchase Receiving'}, purchasereceiving_sub:{ar:'مراجعة الأعداد الفعلية المستلمة بالمخزن',en:'Review actual received quantities at the warehouse'},
+  pricelists:{ar:'قوائم الأسعار',en:'Price Lists'}, pricelists_sub:{ar:'أسعار جملة أو مخصصة لمجموعات عملاء',en:'Wholesale or custom pricing for customer groups'},
   expenses:{ar:'المصروفات',en:'Expenses'}, expenses_sub:{ar:'تسجيل ومتابعة مصروفات الشركة',en:'Track company expenses'},
   quotations:{ar:'عروض الأسعار',en:'Quotations'}, quotations_sub:{ar:'إنشاء ومتابعة عروض الأسعار للعملاء',en:'Create and track customer quotations'},
   consignment:{ar:'البيع بالأمانة',en:'Consignment'}, consignment_sub:{ar:'إدارة البضاعة الموردة بنظام الأمانة لدى المتاجر',en:'Manage goods held on consignment at stores'},
@@ -700,6 +702,9 @@ const DEFAULT_ACCOUNTS = [
   {id:'acc_consign_comm', code:'5300', name:'عمولات بيع بالأمانة', type:'expense'},
   {id:'acc_samples', code:'5400', name:'عينات وتسترز مجانية (تسويق)', type:'expense'},
   {id:'acc_scrap', code:'5500', name:'هالك وتوالف التصنيع', type:'expense'},
+  {id:'acc_wip', code:'1225', name:'أعمال تحت التنفيذ (تصنيع)', type:'asset'},
+  {id:'acc_goods_transit', code:'1175', name:'بضاعة بالطريق (مشتريات لم تستلم)', type:'asset'},
+  {id:'acc_recv_discrepancy', code:'5600', name:'فروقات استلام المشتريات', type:'expense'},
 ];
 const PAYMENT_TERMS = [
   {id:'immediate', label:'نقداً - فوري', labelEn:'Immediate', days:0},
@@ -755,6 +760,7 @@ const NAV_GROUPS = [
     {id:'consignment', icon:'consign'},
     {id:'salesreports', icon:'reports', submenu:SALES_REPORT_TYPES, tabVar:'salesReportTab'},
     {id:'customers', icon:'customers'},
+    {id:'pricelists', icon:'journal'},
     {id:'crm', icon:'customers'},
   ]},
   {group:'grp_purchases', items:[
@@ -764,6 +770,7 @@ const NAV_GROUPS = [
   ]},
   {group:'grp_inventory', items:[
     {id:'inventory', icon:'inventory'},
+    {id:'purchasereceiving', icon:'purchases'},
     {id:'boms', icon:'journal'},
     {id:'production', icon:'inventory'},
     {id:'landedcosts', icon:'purchases'},
@@ -1035,7 +1042,7 @@ async function testSupaConnection(url,key){
   return true;
 }
 async function loadAll(){
-  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,settings] = await Promise.all([
+  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,settings] = await Promise.all([
     loadKey('zib_products', []),
     loadKey('zib_customers', []),
     loadKey('zib_suppliers', []),
@@ -1062,9 +1069,10 @@ async function loadAll(){
     loadKey('zib_accounts', []),
     loadKey('zib_journal', []),
     loadKey('zib_activity_log', []),
+    loadKey('zib_price_lists', []),
     loadKey('zib_settings', { companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 }),
   ]);
-  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,settings};
+  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,settings};
   if(DB.settings.taxRate==null) DB.settings.taxRate = 0;
   if(DB.settings.taxEnabled==null) DB.settings.taxEnabled = false;
   DB_BASELINE = deepClone(DB);
@@ -1118,7 +1126,7 @@ const PERSIST_KEY_MAP = {
   products:'zib_products', customers:'zib_customers', suppliers:'zib_suppliers',
   sales:'zib_sales', purchases:'zib_purchases', returns:'zib_returns', quotations:'zib_quotations', stockMoves:'zib_stock_moves',
   consignShipments:'zib_consign_shipments', consignReports:'zib_consign_reports', testerHandouts:'zib_tester_handouts', expenses:'zib_expenses', productGroups:'zib_product_groups', crmActivities:'zib_crm_activities', purchaseOrders:'zib_purchase_orders', warehouses:'zib_warehouses', salesReps:'zib_sales_reps', custodies:'zib_custodies', custodyEntries:'zib_custody_entries', boms:'zib_boms', productionOrders:'zib_production_orders', landedCosts:'zib_landed_costs', comments:'zib_comments', accounts:'zib_accounts', journal:'zib_journal',
-  activityLog:'zib_activity_log', settings:'zib_settings'
+  activityLog:'zib_activity_log', priceLists:'zib_price_lists', settings:'zib_settings'
 };
 function persist(part){
   if(!part) return;
@@ -1790,7 +1798,7 @@ function render(){
     dashboard: renderDashboard, sales: renderSales, purchases: renderPurchases,
     inventory: renderInventory, customers: ()=>renderParty('customers'),
     suppliers: ()=>renderParty('suppliers'), accounts: renderAccounts, journal: renderJournalPage,
-    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage, health: renderHealthCheckPage, boms: renderBomsPage, production: renderProductionPage, landedcosts: renderLandedCostsPage
+    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage, health: renderHealthCheckPage, boms: renderBomsPage, production: renderProductionPage, landedcosts: renderLandedCostsPage, purchasereceiving: renderPurchaseReceivingPage, pricelists: renderPriceListsPage
   };
   c.innerHTML = (map[VIEW]||renderDashboard)();
 }
@@ -2222,12 +2230,14 @@ let productionFilter = '';
 function renderProductionPage(){
   const list = DB.productionOrders.filter(o=>o.bomName.toLowerCase().includes(productionFilter.toLowerCase()) || o.producedProductName.toLowerCase().includes(productionFilter.toLowerCase()));
   const pendingCount = DB.productionOrders.filter(o=>o.status==='pending').length;
+  const inProgressCount = DB.productionOrders.filter(o=>o.status==='in_progress').length;
   const shortages = getRawMaterialShortages();
   return `
     ${shortages.length>0?`<div class="alert-bar">${icon('alert')}<div><b>${shortages.length}</b> مادة خام ناقصة عشان تقدر تكمّل أوامر التصنيع المعلّقة: ${shortages.map(s=>esc(s.product.name)+' (ناقص '+fmt(s.short)+')').join('، ')}</div></div>`:''}
     <div class="stat-grid">
       <div class="stat-card"><div class="lbl">${icon('inventory')} إجمالي أوامر التصنيع</div><div class="val">${DB.productionOrders.length}</div></div>
-      ${pendingCount>0?`<div class="stat-card gold"><div class="lbl">${icon('alert')} بانتظار الموافقة</div><div class="val">${pendingCount}</div></div>`:''}
+      ${pendingCount>0?`<div class="stat-card gold"><div class="lbl">${icon('alert')} أوامر جديدة</div><div class="val">${pendingCount}</div></div>`:''}
+      ${inProgressCount>0?`<div class="stat-card gold"><div class="lbl">${icon('alert')} جاري التنفيذ</div><div class="val">${inProgressCount}</div></div>`:''}
     </div>
     <div class="card">
       <div class="card-head">
@@ -2240,13 +2250,14 @@ function renderProductionPage(){
       <div class="table-wrap"><table>
         <thead><tr><th>الرقم</th><th>المنتج الناتج</th><th>الكمية</th><th>التاريخ</th><th>التكلفة الإجمالية</th><th>الحالة</th><th></th></tr></thead>
         <tbody>${list.sort((a,b)=>b.createdAt-a.createdAt).map(o=>{
-          const statusBadge = o.status==='pending' ? '<span class="badge partial">بانتظار الموافقة</span>' : o.status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : '<span class="badge paid">معتمد</span>';
+          const statusBadge = o.status==='pending' ? '<span class="badge partial">جديد</span>' : o.status==='in_progress' ? '<span class="badge neutral">جاري التنفيذ</span>' : o.status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : '<span class="badge paid">منتهي</span>';
           return `<tr>
             <td>${o.number}</td><td>${esc(o.producedProductName)}</td><td class="tnum">${fmt(o.producedQty)}</td><td>${fmtDate(o.date)}</td>
             <td class="tnum">${money(o.totalCost)}</td><td>${statusBadge}</td>
             <td>
               <button class="btn btn-outline btn-sm" onclick="openProductionOrderDetail('${o.id}')">${icon('statement')} التفاصيل</button>
-              ${o.status==='pending'?`${can('approve_expenses')?`<button class="btn btn-primary btn-sm" onclick="approveProductionOrder('${o.id}')">${icon('plus')} اعتماد</button><button class="btn btn-danger-o btn-sm" onclick="rejectProductionOrder('${o.id}')">رفض</button>`:''}`:''}
+              ${o.status==='pending'&&can('approve_expenses')?`<button class="btn btn-primary btn-sm" onclick="startProductionOrder('${o.id}')">${icon('plus')} بدء التنفيذ</button><button class="btn btn-danger-o btn-sm" onclick="rejectProductionOrder('${o.id}')">رفض</button>`:''}
+              ${o.status==='in_progress'&&can('approve_expenses')?`<button class="btn btn-primary btn-sm" onclick="openProductionCompletionModal('${o.id}')">${icon('plus')} إنهاء التصنيع</button>`:''}
               ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteProductionOrder('${o.id}')">${icon('trash')}</button>`:''}
             </td>
           </tr>`;
@@ -2271,11 +2282,6 @@ function openProductionOrderModal(editId, preselectBomId){
       <div class="field"><label>تكلفة عمالة/تشغيل إضافية (اختياري)</label><input id="f_overhead" type="number" min="0" step="0.01" value="${o?o.overheadCost||0:0}" oninput="document.getElementById('overheadCashField').style.display = (parseFloat(this.value)||0)>0 ? 'block' : 'none';"></div>
       <div class="field" id="overheadCashField" style="display:${o&&o.overheadCost>0?'block':'none'};"><label>الخزينة / الحساب البنكي المصروف منه</label><select id="f_overhead_cash">${cashBankOptionsHtml(o?o.overheadCashAccountId:null)}</select></div>
     </div>
-    <div class="row2" style="margin-top:10px;">
-      <div class="field"><label>نسبة هالك مواد خام إضافية % (اختياري)</label><input id="f_waste_pct" type="number" min="0" max="100" step="0.1" value="${o?o.wastePercent||0:0}" oninput="updateProductionPreview()"></div>
-      <div class="field"><label>عدد وحدات تالفة من الناتج (اختياري)</label><input id="f_defective_qty" type="number" min="0" step="1" value="${o?o.defectiveQty||0:0}"></div>
-    </div>
-    <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0 0;">الهالك والتوالف بيتحسبوا كمصروف منفصل ("هالك وتوالف التصنيع") ومش بيدخلوا في تكلفة الوحدة السليمة، عشان تكلفة المنتج تفضل واضحة.</p>
     <div class="field" style="margin-top:10px;"><label>ملاحظات</label><input id="f_notes" value="${o?esc(o.notes||''):''}"></div>
   `;
   openModal(o?'تعديل أمر تصنيع':'أمر تصنيع جديد', body, ()=>{
@@ -2289,9 +2295,6 @@ function openProductionOrderModal(editId, preselectBomId){
     const overheadCost = parseFloat(document.getElementById('f_overhead').value)||0;
     const overheadCashAccountId = overheadCost>0 ? document.getElementById('f_overhead_cash').value : null;
     if(overheadCost>0 && !overheadCashAccountId){ toast('اختر الخزينة المصروف منها تكلفة العمالة/التشغيل'); return false; }
-    const wastePercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('f_waste_pct').value)||0));
-    const defectiveQty = Math.max(0, parseFloat(document.getElementById('f_defective_qty').value)||0);
-    if(defectiveQty>=producedQty){ toast('عدد الوحدات التالفة لازم يكون أقل من الكمية المنتجة'); return false; }
     const multiplier = producedQty / bom.outputQty;
     const materials = bom.items.map(it=>{
       const p = productById(it.materialId);
@@ -2303,10 +2306,10 @@ function openProductionOrderModal(editId, preselectBomId){
     const unitCost = producedQty>0 ? totalCost/producedQty : 0;
     if(!checkPeriodLock(date)) return false;
     if(o){
-      Object.assign(o, { bomId, bomName:bom.name, producedProductId:bom.productId, producedProductName:bom.productName, date, producedQty, materials, materialsCost, overheadCost, overheadCashAccountId, totalCost, unitCost, notes, wastePercent, defectiveQty });
+      Object.assign(o, { bomId, bomName:bom.name, producedProductId:bom.productId, producedProductName:bom.productName, date, producedQty, materials, materialsCost, overheadCost, overheadCashAccountId, totalCost, unitCost, notes });
       logActivity('production', 'تعديل أمر تصنيع '+o.number);
     }else{
-      const order = { id:uid(), number:nextNumber(DB.productionOrders,'PRD'), bomId, bomName:bom.name, producedProductId:bom.productId, producedProductName:bom.productName, date, producedQty, materials, materialsCost, overheadCost, overheadCashAccountId, totalCost, unitCost, notes, wastePercent, defectiveQty, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
+      const order = { id:uid(), number:nextNumber(DB.productionOrders,'PRD'), bomId, bomName:bom.name, producedProductId:bom.productId, producedProductName:bom.productName, date, producedQty, materials, materialsCost, overheadCost, overheadCashAccountId, totalCost, unitCost, notes, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
       DB.productionOrders.push(order);
       logActivity('production', 'إنشاء أمر تصنيع '+order.number+' - '+bom.productName+' بكمية '+fmt(producedQty)+' (بانتظار الموافقة)');
     }
@@ -2324,31 +2327,28 @@ function updateProductionPreview(){
   const bom = DB.boms.find(x=>x.id===bomId);
   if(!bom){ previewEl.innerHTML = ''; return; }
   const producedQty = parseFloat(qtyEl.value)||0;
-  const wastePctEl = document.getElementById('f_waste_pct');
-  const wastePct = wastePctEl ? Math.max(0, parseFloat(wastePctEl.value)||0) : 0;
   const multiplier = bom.outputQty>0 ? producedQty/bom.outputQty : 0;
   const rows = bom.items.map(it=>{
     const p = productById(it.materialId);
     const needed = it.qty*multiplier;
-    const neededWithWaste = needed * (1+wastePct/100);
     const avail = p?p.quantity:0;
-    const short = neededWithWaste>avail+0.001;
-    return `<tr><td>${esc(it.name)}</td><td class="tnum">${fmt(needed)}${wastePct>0?' <span style="color:var(--text-muted);">(+'+fmt(needed*wastePct/100)+' هالك)</span>':''}</td><td class="tnum" style="${short?'color:var(--danger);font-weight:700;':''}">${fmt(avail)}${short?' (غير كافي!)':''}</td></tr>`;
+    const short = needed>avail+0.001;
+    return `<tr><td>${esc(it.name)}</td><td class="tnum">${fmt(needed)}</td><td class="tnum" style="${short?'color:var(--danger);font-weight:700;':''}">${fmt(avail)}${short?' (غير كافي!)':''}</td></tr>`;
   }).join('');
   const totalCost = bom.items.reduce((s,it)=>{ const p=productById(it.materialId); return s+it.qty*multiplier*(p?p.purchasePrice:0); },0);
   previewEl.innerHTML = `
     <label>المواد الخام المطلوبة (محسوبة تلقائياً)</label>
     <div class="table-wrap"><table>
-      <thead><tr><th>المادة الخام</th><th>الكمية المطلوبة (شاملة الهالك)</th><th>المتاح بالمخزون</th></tr></thead>
+      <thead><tr><th>المادة الخام</th><th>الكمية المطلوبة</th><th>المتاح بالمخزون</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <div class="tot-line grand" style="margin-top:8px;"><span>التكلفة الإجمالية التقديرية (بدون هالك)</span><span class="tnum">${money(totalCost)}</span></div>
+    <div class="tot-line grand" style="margin-top:8px;"><span>التكلفة الإجمالية التقديرية</span><span class="tnum">${money(totalCost)}</span></div>
   `;
 }
 function openProductionOrderDetail(id){
   const o = DB.productionOrders.find(x=>x.id===id);
   if(!o) return;
-  const statusBadge = o.status==='pending' ? '<span class="badge partial">بانتظار الموافقة</span>' : o.status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : '<span class="badge paid">معتمد</span>';
+  const statusBadge = o.status==='pending' ? '<span class="badge partial">جديد</span>' : o.status==='in_progress' ? '<span class="badge neutral">جاري التنفيذ</span>' : o.status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : '<span class="badge paid">منتهي</span>';
   const body = `
     <div class="stat-grid" style="margin-bottom:14px;">
       <div class="stat-card"><div class="lbl">المنتج الناتج</div><div class="val" style="font-size:15px;">${esc(o.producedProductName)}</div></div>
@@ -2370,41 +2370,91 @@ function openProductionOrderDetail(id){
   openModal('تفاصيل أمر تصنيع '+o.number, body, ()=>{ closeModal(); });
   document.getElementById('modalSaveBtn').style.display='none';
 }
-function approveProductionOrder(id){
-  if(!requirePerm('approve_expenses','اعتماد أوامر التصنيع')) return;
+function startProductionOrder(id){
+  if(!requirePerm('approve_expenses','بدء تنفيذ أوامر التصنيع')) return;
   const o = DB.productionOrders.find(x=>x.id===id);
   if(!o || o.status!=='pending') return;
   if(!checkPeriodLock(o.date)) return;
-  const wastePct = o.wastePercent||0;
-  const defectiveQty = o.defectiveQty||0;
   for(const m of o.materials){
     const p = productById(m.productId);
-    const neededWithWaste = m.qty * (1+wastePct/100);
-    if(!p || neededWithWaste>p.quantity+0.001){ toast('لا يمكن الاعتماد: الكمية المطلوبة من "'+m.name+'" (شاملة الهالك) أكبر من المتاح بالمخزون حالياً'); return; }
+    if(!p || m.qty>p.quantity+0.001){ toast('لا يمكن بدء التنفيذ: الكمية المطلوبة من "'+m.name+'" أكبر من المتاح بالمخزون حالياً'); return; }
   }
-  confirmAction('اعتماد أمر التصنيع', 'سيتم خصم المواد الخام وإضافة المنتج الجاهز للمخزون فوراً. هل أنت متأكد؟', ()=>{
-    o.status = 'approved'; o.approvedBy = currentUserName(); o.approvedAt = Date.now();
-    persist('productionOrders');
-    let wasteMaterialsCost = 0;
+  confirmAction('بدء تنفيذ أمر التصنيع', 'سيتم خصم المواد الخام من المخزون فوراً ونقل قيمتها لحساب "أعمال تحت التنفيذ". هل أنت متأكد؟', ()=>{
+    o.status = 'in_progress'; o.startedBy = currentUserName(); o.startedAt = Date.now();
     o.materials.forEach(m=>{
       const p = productById(m.productId);
       adjustStock(p, -m.qty);
       logStockMove(m.productId, -m.qty, 'production_consume', o.number, 'استهلاك في تصنيع '+o.producedProductName);
-      const wasteQty = m.qty * (wastePct/100);
-      if(wasteQty>0.0001){
-        adjustStock(p, -wasteQty);
-        logStockMove(m.productId, -wasteQty, 'production_waste', o.number, 'هالك مواد خام في تصنيع '+o.producedProductName);
-        wasteMaterialsCost += wasteQty * m.cost;
-      }
     });
-    const goodQty = o.producedQty - defectiveQty;
+    persist('products'); persist('productionOrders');
+    const materialsCost = o.materialsCost!=null ? o.materialsCost : o.totalCost;
+    postJournal(o.date, 'بدء تنفيذ أمر تصنيع '+o.number+' - صرف مواد خام', [
+      {accountId:'acc_wip', debit:materialsCost, credit:0},
+      {accountId:'acc_inventory', debit:0, credit:materialsCost},
+    ], 'production_start', o.id);
+    logActivity('production', 'بدء تنفيذ أمر تصنيع '+o.number);
+    closeModal(); render(); toast('تم بدء التنفيذ - المواد الخام اتخصمت وبقت جاري تنفيذها');
+  });
+}
+function openProductionCompletionModal(id){
+  if(!requirePerm('approve_expenses','إنهاء أوامر التصنيع')) return;
+  const o = DB.productionOrders.find(x=>x.id===id);
+  if(!o || o.status!=='in_progress') return;
+  const body = `
+    <div class="alert-bar">${icon('alert')}<div>راجع لو حصل أي هالك في المواد الخام أثناء التصنيع، أو لو طلع وحدات تالفة من الناتج - قبل ما تأكد إنهاء الأمر.</div></div>
+    <p style="font-size:12.5px;color:var(--text-muted);">أمر تصنيع ${o.number} - ${esc(o.producedProductName)} - كمية مطلوب إنتاجها: ${fmt(o.producedQty)}</p>
+    <div class="field"><label>نسبة هالك مواد خام إضافية % (اختياري)</label><input id="f_waste_pct" type="number" min="0" max="100" step="0.1" value="0"></div>
+    <div class="field" style="margin-top:10px;"><label>عدد وحدات تالفة من الناتج (اختياري)</label><input id="f_defective_qty" type="number" min="0" step="1" value="0"></div>
+    <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0 0;">الهالك والتوالف بيتحسبوا كمصروف منفصل ("هالك وتوالف التصنيع") ومش بيدخلوا في تكلفة الوحدة السليمة، عشان تكلفة المنتج تفضل واضحة.</p>
+  `;
+  openModal('إنهاء أمر تصنيع '+o.number, body, ()=>{
+    const wastePercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('f_waste_pct').value)||0));
+    const defectiveQty = Math.max(0, parseFloat(document.getElementById('f_defective_qty').value)||0);
+    if(defectiveQty>=o.producedQty){ toast('عدد الوحدات التالفة لازم يكون أقل من الكمية المنتجة'); return false; }
+    for(const m of o.materials){
+      const p = productById(m.productId);
+      const wasteQty = m.qty * (wastePercent/100);
+      if(wasteQty>0.0001 && (!p || wasteQty>p.quantity+0.001)){ toast('لا يمكن الإنهاء: كمية الهالك الإضافية من "'+m.name+'" أكبر من المتاح بالمخزون حالياً'); return false; }
+    }
+    completeProductionOrder(o.id, wastePercent, defectiveQty);
+  });
+}
+function completeProductionOrder(id, wastePercent, defectiveQty){
+  if(!requirePerm('approve_expenses','إنهاء أوامر التصنيع')) return;
+  const o = DB.productionOrders.find(x=>x.id===id);
+  if(!o || o.status!=='in_progress') return;
+  if(!checkPeriodLock(o.date)) return;
+  if(!productById(o.producedProductId)){ toast('لا يمكن الإنهاء: المنتج الناتج محذوف أو غير موجود حالياً في النظام'); return; }
+  const orphanMaterial = o.materials.find(m=>!productById(m.productId));
+  if(orphanMaterial){ toast('لا يمكن الإنهاء: المادة "'+orphanMaterial.name+'" مرتبطة بمنتج محذوف أو غير موجود حالياً'); return; }
+  confirmAction('إنهاء أمر التصنيع', 'سيتم إضافة المنتج الجاهز للمخزون ونقل قيمة "أعمال تحت التنفيذ" لتكلفة المنتج. هل أنت متأكد؟', ()=>{
+    o.status = 'approved'; o.approvedBy = currentUserName(); o.approvedAt = Date.now();
+    o.wastePercent = wastePercent||0; o.defectiveQty = defectiveQty||0;
+    let wasteMaterialsCost = 0;
+    if(wastePercent>0){
+      o.materials.forEach(m=>{
+        const p = productById(m.productId);
+        const wasteQty = m.qty * (wastePercent/100);
+        if(wasteQty>0.0001){
+          adjustStock(p, -wasteQty);
+          logStockMove(m.productId, -wasteQty, 'production_waste', o.number, 'هالك مواد خام في تصنيع '+o.producedProductName);
+          wasteMaterialsCost += wasteQty * m.cost;
+        }
+      });
+    }
+    const goodQty = o.producedQty - (defectiveQty||0);
     const finished = productById(o.producedProductId);
     finished.purchasePrice = o.unitCost;
     adjustStock(finished, goodQty);
     logStockMove(o.producedProductId, goodQty, 'production_output', o.number, 'ناتج تصنيع - '+o.bomName);
-    const defectiveCost = defectiveQty * o.unitCost;
+    const defectiveCost = (defectiveQty||0) * o.unitCost;
     if(defectiveQty>0.0001) logStockMove(o.producedProductId, 0, 'production_defective', o.number, defectiveQty+' وحدة تالفة من الناتج - قيمتها '+money(defectiveCost));
-    persist('products');
+    persist('products'); persist('productionOrders');
+    const materialsCost = o.materialsCost!=null ? o.materialsCost : o.totalCost;
+    postJournal(o.date, 'إنهاء أمر تصنيع '+o.number+' - تحويل من أعمال تحت التنفيذ', [
+      {accountId:'acc_inventory', debit:materialsCost, credit:0},
+      {accountId:'acc_wip', debit:0, credit:materialsCost},
+    ], 'production_complete', o.id);
     if(o.overheadCost>0 && o.overheadCashAccountId){
       postJournal(o.date, 'تكلفة عمالة/تشغيل - أمر تصنيع '+o.number, [
         {accountId:'acc_inventory', debit:o.overheadCost, credit:0},
@@ -2418,8 +2468,8 @@ function approveProductionOrder(id){
         {accountId:'acc_inventory', debit:0, credit:totalScrapValue},
       ], 'production_scrap', o.id);
     }
-    logActivity('production', 'اعتماد أمر تصنيع '+o.number+' - إنتاج '+fmt(goodQty)+' من '+o.producedProductName+(totalScrapValue>0.009?' (هالك/توالف بقيمة '+money(totalScrapValue)+')':''));
-    closeModal(); render(); toast('تم الاعتماد بنجاح - تم تحديث المخزون وتكلفة المنتج');
+    logActivity('production', 'إنهاء أمر تصنيع '+o.number+' - إنتاج '+fmt(goodQty)+' من '+o.producedProductName+(totalScrapValue>0.009?' (هالك/توالف بقيمة '+money(totalScrapValue)+')':''));
+    closeModal(); render(); toast('تم إنهاء التصنيع بنجاح - تم تحديث المخزون وتكلفة المنتج');
   });
 }
 function rejectProductionOrder(id){
@@ -2438,12 +2488,15 @@ function deleteProductionOrder(id){
   const o = DB.productionOrders.find(x=>x.id===id);
   if(!o) return;
   const isApproved = o.status==='approved';
-  if(isApproved && !checkPeriodLock(o.date)) return;
-  confirmAction('حذف أمر التصنيع', isApproved?'الأمر ده معتمد بالفعل - سيتم إرجاع المواد الخام وخصم الكمية المنتجة من المخزون'+(o.overheadCost>0?' وعكس قيد تكلفة العمالة/التشغيل':'')+'. هل أنت متأكد؟':'هل تريد حذف هذا الأمر؟', ()=>{
-    if(isApproved){
+  const isInProgress = o.status==='in_progress';
+  if((isApproved||isInProgress) && !checkPeriodLock(o.date)) return;
+  const msg = isApproved ? 'الأمر ده متنهي بالفعل - سيتم إرجاع المواد الخام وخصم الكمية المنتجة من المخزون'+(o.overheadCost>0?' وعكس قيد تكلفة العمالة/التشغيل':'')+'. هل أنت متأكد؟'
+    : isInProgress ? 'الأمر ده جاري تنفيذه بالفعل والمواد الخام اتخصمت - سيتم إرجاعها للمخزون وعكس قيد أعمال تحت التنفيذ. هل أنت متأكد؟'
+    : 'هل تريد حذف هذا الأمر؟';
+  confirmAction('حذف أمر التصنيع', msg, ()=>{
+    if(isApproved || isInProgress){
       removeJournalBySource(o.id);
       const wastePct = o.wastePercent||0;
-      const defectiveQty = o.defectiveQty||0;
       o.materials.forEach(m=>{
         const p = productById(m.productId);
         if(p){
@@ -2452,9 +2505,12 @@ function deleteProductionOrder(id){
           if(wasteQty>0.0001){ adjustStock(p, wasteQty); logStockMove(m.productId, wasteQty, 'production_reverse', o.number, 'إلغاء أمر تصنيع - إرجاع هالك مادة خام'); }
         }
       });
-      const goodQty = o.producedQty - defectiveQty;
-      const finished = productById(o.producedProductId);
-      if(finished){ adjustStock(finished, -goodQty); logStockMove(o.producedProductId, -goodQty, 'production_reverse', o.number, 'إلغاء أمر تصنيع - خصم المنتج الناتج'); }
+      if(isApproved){
+        const defectiveQty = o.defectiveQty||0;
+        const goodQty = o.producedQty - defectiveQty;
+        const finished = productById(o.producedProductId);
+        if(finished){ adjustStock(finished, -goodQty); logStockMove(o.producedProductId, -goodQty, 'production_reverse', o.number, 'إلغاء أمر تصنيع - خصم المنتج الناتج'); }
+      }
       persist('products');
     }
     DB.productionOrders = DB.productionOrders.filter(x=>x.id!==id);
@@ -2465,6 +2521,37 @@ function deleteProductionOrder(id){
 }
 /* ============ LANDED COSTS (الشحن والتكاليف الإضافية) ============ */
 let landedCostFilter = '';
+function renderPurchaseReceivingPage(){
+  const queue = DB.purchases.filter(p=>(p.status||'approved')==='approved' && !p.received).sort((a,b)=>(a.approvedAt||a.createdAt)-(b.approvedAt||b.createdAt));
+  const received = DB.purchases.filter(p=>p.received).sort((a,b)=>b.receivedAt-a.receivedAt).slice(0,15);
+  return `
+    <div class="card">
+      <div class="card-head"><h2>بانتظار الاستلام بالمخزن (${queue.length})</h2></div>
+      ${queue.length===0?emptyState('لا توجد فواتير شراء بانتظار الاستلام','كل فواتير الشراء المعتمدة اتستلمت بالمخزن', false):`
+      <div class="table-wrap"><table>
+        <thead><tr><th>رقم الفاتورة</th><th>المورد</th><th>تاريخ الاعتماد</th><th>عدد الأصناف</th><th>القيمة</th><th></th></tr></thead>
+        <tbody>${queue.map(p=>`
+          <tr>
+            <td>${p.number}</td><td>${esc(p.partyName)}</td><td>${fmtDate(p.approvedAt?new Date(p.approvedAt).toISOString().slice(0,10):p.date)}</td>
+            <td class="tnum">${p.items.length}</td><td class="tnum">${money(p.subtotal-p.discountAmount)}</td>
+            <td><button class="btn btn-primary btn-sm" onclick="openReceivingReviewModal('${p.id}')">${icon('inventory')} مراجعة واستلام</button></td>
+          </tr>`).join('')}</tbody>
+      </table></div>`}
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-head"><h2>آخر عمليات الاستلام</h2></div>
+      ${received.length===0?emptyState('لا توجد عمليات استلام بعد','', false):`
+      <div class="table-wrap"><table>
+        <thead><tr><th>رقم الفاتورة</th><th>المورد</th><th>تاريخ الاستلام</th><th>بواسطة</th><th>ملاحظات</th></tr></thead>
+        <tbody>${received.map(p=>`
+          <tr>
+            <td>${p.number}</td><td>${esc(p.partyName)}</td><td>${new Date(p.receivedAt).toLocaleDateString('ar-EG-u-nu-latn')}</td><td>${esc(p.receivedBy||'-')}</td>
+            <td>${p.receivingNotes?esc(p.receivingNotes):'-'}</td>
+          </tr>`).join('')}</tbody>
+      </table></div>`}
+    </div>
+  `;
+}
 function renderLandedCostsPage(){
   const list = DB.landedCosts.filter(l=>(l.number+l.notes).toLowerCase().includes(landedCostFilter.toLowerCase()));
   const pendingCount = DB.landedCosts.filter(l=>l.status==='pending').length;
@@ -2505,7 +2592,7 @@ function renderLandedCostsPage(){
 function openLandedCostModal(editId){
   const l = editId ? DB.landedCosts.find(x=>x.id===editId) : null;
   if(l && l.status!=='pending'){ toast('الأمر ده اتعامل معاه بالفعل - لا يمكن تعديله'); return; }
-  const purchaseOpts = approvedPurchases().map(p=>`<option value="${p.id}" ${l&&l.purchaseId===p.id?'selected':''}>${p.number} - ${esc(p.partyName)} (${fmtDate(p.date)})</option>`).join('');
+  const purchaseOpts = approvedPurchases().filter(p=>p.received).map(p=>`<option value="${p.id}" ${l&&l.purchaseId===p.id?'selected':''}>${p.number} - ${esc(p.partyName)} (${fmtDate(p.date)})</option>`).join('');
   window._landedProductOpts = DB.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   const body = `
     <div class="alert-bar">${icon('alert')}<div>هيتسجل <b>بانتظار الموافقة</b>، وتكلفة المنتجات مش هتتحدّث إلا بعد الاعتماد.</div></div>
@@ -3122,9 +3209,12 @@ function duplicateProduct(id){
 function deleteProduct(id){
   if(!requirePerm('delete_records','حذف المنتجات')) return;
   const p = productById(id);
+  const used = DB.sales.some(s=>s.items.some(it=>it.productId===id)) || DB.purchases.some(s=>s.items.some(it=>it.productId===id));
+  if(used){ toast('لا يمكن حذف هذا المنتج لوجود فواتير مرتبطة به'); return; }
   confirmAction('حذف المنتج', 'هل تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.', ()=>{
     DB.products = DB.products.filter(x=>x.id!==id);
-    persist('products');
+    DB.priceLists.forEach(pl=>{ if(pl.prices && pl.prices[id]!=null) delete pl.prices[id]; });
+    persist('products'); persist('priceLists');
     logActivity('product_delete', 'حذف منتج '+(p?p.name:id));
     closeModal(); render(); toast('تم حذف المنتج');
   });
@@ -3522,14 +3612,15 @@ function openPartyModal(kind, id){
       <div class="field"><label>رقم الهاتف</label><input id="f_phone" value="${x?esc(x.phone):''}"></div>
       <div class="field"><label>العنوان</label><input id="f_addr" value="${x?esc(x.address):''}"></div>
     </div>
-    ${isCust?`<div class="field"><label>الحد الائتماني (اختياري - 0 = بدون حد)</label><input id="f_credit_limit" type="number" min="0" step="0.01" value="${x&&x.creditLimit?x.creditLimit:0}"></div>`:''}
+    ${isCust?`<div class="field"><label>الحد الائتماني (اختياري - 0 = بدون حد)</label><input id="f_credit_limit" type="number" min="0" step="0.01" value="${x&&x.creditLimit?x.creditLimit:0}"></div>
+    <div class="field"><label>قائمة الأسعار (اختياري - افتراضي = السعر العادي)</label><select id="f_pricelist"><option value="">السعر العادي</option>${DB.priceLists.map(pl=>`<option value="${pl.id}" ${x&&x.priceListId===pl.id?'selected':''}>${esc(pl.name)}</option>`).join('')}</select></div>`:''}
     <div class="field"><label>ملاحظات</label><textarea id="f_notes" rows="2">${x?esc(x.notes):''}</textarea></div>
   `;
   openModal(x? (isCust?'تعديل عميل':'تعديل مورد') : (isCust?'عميل جديد':'مورد جديد'), body, ()=>{
     const name = document.getElementById('f_name').value.trim();
     if(!name){ toast('من فضلك أدخل الاسم'); return false; }
     const data = { name, phone:document.getElementById('f_phone').value.trim(), address:document.getElementById('f_addr').value.trim(), notes:document.getElementById('f_notes').value.trim() };
-    if(isCust){ const clEl = document.getElementById('f_credit_limit'); data.creditLimit = clEl ? (parseFloat(clEl.value)||0) : 0; }
+    if(isCust){ const clEl = document.getElementById('f_credit_limit'); data.creditLimit = clEl ? (parseFloat(clEl.value)||0) : 0; const plEl = document.getElementById('f_pricelist'); data.priceListId = plEl && plEl.value ? plEl.value : null; }
     const doSave = ()=>{
       if(x){ Object.assign(x,data); } else { data.id=uid(); DB[kind].push(data); }
       persist(kind);
@@ -3556,6 +3647,94 @@ function deleteParty(kind, id){
     DB[kind] = DB[kind].filter(p=>p.id!==id);
     persist(kind);
     logActivity('party_delete', 'حذف '+(kind==='customers'?'عميل ':'مورد ')+(x?x.name:id));
+    closeModal(); render(); toast('تم الحذف');
+  });
+}
+function getEffectivePrice(productId, customerId){
+  const p = productById(productId);
+  if(!p) return 0;
+  if(!customerId) return p.salePrice||0;
+  const cust = customerById(customerId);
+  if(!cust || !cust.priceListId) return p.salePrice||0;
+  const pl = DB.priceLists.find(x=>x.id===cust.priceListId);
+  if(!pl || !pl.prices || pl.prices[productId]==null) return p.salePrice||0;
+  return pl.prices[productId];
+}
+let priceListFilter = '';
+function renderPriceListsPage(){
+  const list = DB.priceLists.filter(pl=>pl.name.toLowerCase().includes(priceListFilter.toLowerCase()));
+  return `
+    <div class="card">
+      <div class="card-head">
+        <h2>قوائم الأسعار (${DB.priceLists.length})</h2>
+        <button class="btn btn-primary" onclick="openPriceListModal()">${icon('plus')} قائمة أسعار جديدة</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-muted);">اربط أي قائمة سعر بعميل من صفحة "العملاء" - أي منتج مش محدد له سعر خاص في القائمة هياخد السعر العادي تلقائياً.</p>
+      <div class="search-bar"><input placeholder="بحث باسم القائمة..." value="${esc(priceListFilter)}" oninput="priceListFilter=this.value; render();"></div>
+      ${list.length===0?emptyState('لا توجد قوائم أسعار بعد','أنشئ قائمة زي "جملة" وحدد أسعار مخصصة للمنتجات اللي عايزها', false):`
+      <div class="table-wrap"><table>
+        <thead><tr><th>الاسم</th><th>عدد المنتجات المخصصة</th><th>عدد العملاء المرتبطين</th><th></th></tr></thead>
+        <tbody>${list.map(pl=>{
+          const custCount = DB.customers.filter(c=>c.priceListId===pl.id).length;
+          const prodCount = pl.prices ? Object.keys(pl.prices).length : 0;
+          return `<tr>
+            <td>${esc(pl.name)}</td><td class="tnum">${prodCount}</td><td class="tnum">${custCount}</td>
+            <td>
+              <button class="btn btn-outline btn-icon btn-sm" onclick="openPriceListModal('${pl.id}')" title="تعديل">${icon('edit')}</button>
+              ${can('delete_records')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deletePriceList('${pl.id}')">${icon('trash')}</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`}
+    </div>
+  `;
+}
+function openPriceListModal(editId){
+  const pl = editId ? DB.priceLists.find(x=>x.id===editId) : null;
+  const prices = pl ? {...pl.prices} : {};
+  const rows = DB.products.filter(p=>p.productType!=='purchase').map(p=>`
+    <tr>
+      <td>${esc(p.name)}</td>
+      <td class="tnum">${money(p.salePrice||0)}</td>
+      <td><input type="number" min="0" step="0.01" class="plist-price tnum" data-pid="${p.id}" value="${prices[p.id]!=null?prices[p.id]:''}" placeholder="السعر العادي"></td>
+    </tr>`).join('');
+  const body = `
+    <div class="field"><label>اسم القائمة *</label><input id="f_name" value="${pl?esc(pl.name):''}" placeholder="مثال: جملة"></div>
+    <label style="margin-top:10px;">أسعار المنتجات (اختياري - سيب الخانة فاضية لاستخدام السعر العادي)</label>
+    <div class="table-wrap" style="max-height:360px;overflow-y:auto;"><table>
+      <thead><tr><th>المنتج</th><th>السعر العادي</th><th>سعر هذه القائمة</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  `;
+  openModal(pl?'تعديل قائمة الأسعار':'قائمة أسعار جديدة', body, ()=>{
+    const name = document.getElementById('f_name').value.trim();
+    if(!name){ toast('أدخل اسم القائمة'); return false; }
+    const newPrices = {};
+    document.querySelectorAll('.plist-price').forEach(inp=>{
+      const v = inp.value.trim();
+      if(v!=='' && !isNaN(parseFloat(v)) && parseFloat(v)>=0) newPrices[inp.dataset.pid] = parseFloat(v);
+    });
+    if(pl){
+      Object.assign(pl, {name, prices:newPrices});
+      logActivity('settings', 'تعديل قائمة أسعار '+name);
+    }else{
+      DB.priceLists.push({id:uid(), name, prices:newPrices, createdAt:Date.now()});
+      logActivity('settings', 'إنشاء قائمة أسعار '+name);
+    }
+    persist('priceLists');
+    closeModal(); render(); toast('تم الحفظ بنجاح');
+  });
+}
+function deletePriceList(id){
+  if(!requirePerm('delete_records','حذف قوائم الأسعار')) return;
+  const pl = DB.priceLists.find(x=>x.id===id);
+  if(!pl) return;
+  const custCount = DB.customers.filter(c=>c.priceListId===id).length;
+  confirmAction('حذف قائمة الأسعار', custCount>0?'فيه '+custCount+' عميل مرتبط بالقائمة دي - هيرجعوا للسعر العادي تلقائياً. هل تريد المتابعة؟':'هل تريد حذف هذه القائمة؟', ()=>{
+    DB.customers.forEach(c=>{ if(c.priceListId===id) c.priceListId = null; });
+    DB.priceLists = DB.priceLists.filter(x=>x.id!==id);
+    persist('priceLists'); persist('customers');
+    logActivity('settings', 'حذف قائمة أسعار '+pl.name);
     closeModal(); render(); toast('تم الحذف');
   });
 }
@@ -3605,7 +3784,7 @@ function openSaleModal(editId){
   if(editInv && editInv.fromConsignment){ toast('دي فاتورة ناتجة من تقرير مبيعات أمانة - لا يمكن تعديلها مباشرة'); return; }
   if(!editInv && DB.products.length===0){ toast('أضف منتجات أولاً من صفحة المخزون'); return; }
   const customersOpts = DB.customers.map(c=>`<option value="${c.id}" ${editInv&&editInv.partyId===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
-  const productOpts = saleEligibleProducts(editInv?editInv.items.map(it=>it.productId):[]).map(p=>`<option value="${p.id}" data-price="${p.salePrice}" data-stock="${p.quantity}">${esc(p.name)} (متاح: ${fmt(p.quantity)})</option>`).join('');
+  const productOpts = saleEligibleProducts(editInv?editInv.items.map(it=>it.productId):[]).map(p=>`<option value="${p.id}" data-price="${getEffectivePrice(p.id, editInv?editInv.partyId:null)}" data-stock="${p.quantity}">${esc(p.name)} (متاح: ${fmt(p.quantity)})</option>`).join('');
   const termsOpts = PAYMENT_TERMS.map(t=>`<option value="${t.id}" ${editInv&&editInv.paymentTerm===t.id?'selected':''}>${t.label} / ${t.labelEn}</option>`).join('');
   const dTax = DB.settings.taxRate!=null?DB.settings.taxRate:0;
   const body = `
@@ -3838,6 +4017,11 @@ function openSaleModal(editId){
 }
 function onSalePartyChange(selectedBranchId){
   const partyId = document.getElementById('f_party').value;
+  document.querySelectorAll('#itemRows .sel-product').forEach(sel=>{
+    Array.from(sel.options).forEach(opt=>{
+      if(opt.value) opt.dataset.price = getEffectivePrice(opt.value, partyId||null);
+    });
+  });
   const box = document.getElementById('advanceBox');
   const branchSel = document.getElementById('f_branch');
   if(branchSel){
@@ -3845,6 +4029,7 @@ function onSalePartyChange(selectedBranchId){
     const branches = (cust && cust.branches) || [];
     branchSel.innerHTML = '<option value="">بدون فرع - العنوان الرئيسي</option>' + branches.map(b=>`<option value="${b.id}" ${b.id===selectedBranchId?'selected':''}>${esc(b.name)}</option>`).join('');
   }
+  if(!box) return;
   if(!partyId){ box.style.display='none'; box.innerHTML=''; return; }
   const bal = partyAdvanceBalance('customers', partyId);
   if(bal>0.009){
@@ -4562,19 +4747,25 @@ function deleteInvoice(kind, id){
     toast('دي فاتورة ناتجة من تقرير مبيعات أمانة - لا يمكن حذفها مباشرة. استخدم "مرتجع بضاعة أمانة" من صفحة البيع بالأمانة لو محتاج تصحيح.');
     return;
   }
-  const msg = isPending0 ? 'لسه الفاتورة دي مش معتمدة ولا أثّرت على المخزون أو الحسابات - هل تريد حذفها؟' : 'سيتم عكس تأثير هذه الفاتورة على المخزون والقيود المحاسبية. هل تريد المتابعة؟';
+  const notYetReceived0 = kind==='purchases' && inv0 && !isPending0 && !inv0.received;
+  const msg = isPending0 ? 'لسه الفاتورة دي مش معتمدة ولا أثّرت على المخزون أو الحسابات - هل تريد حذفها؟'
+    : notYetReceived0 ? 'الفاتورة دي معتمدة لكن البضاعة لسه مستلمتش بالمخزن - هيتم عكس الالتزام المالي بس من غير أي تأثير على المخزون (لأنه أصلاً معملش). هل تريد المتابعة؟'
+    : 'سيتم عكس تأثير هذه الفاتورة على المخزون والقيود المحاسبية. هل تريد المتابعة؟';
   confirmAction('حذف الفاتورة', msg, ()=>{
     const list = DB[kind];
     const inv = list.find(i=>i.id===id);
     if(inv){
       const isPending = (inv.status||'approved')==='pending';
+      const notYetReceived = kind==='purchases' && !isPending && !inv.received;
       if(!isPending){
-        inv.items.forEach(it=>{
-          const p = productById(it.productId);
-          if(p){ adjustStock(p, kind==='sales'? it.qty : -it.qty); }
-        });
         removeJournalBySource(inv.id);
-        inv.items.forEach(it=>{ logStockMove(it.productId, (kind==='sales'?it.qty:-it.qty), (kind==='sales'?'sale_delete':'purchase_delete'), inv.number, 'حذف فاتورة'); });
+        if(!notYetReceived){
+          inv.items.forEach(it=>{
+            const p = productById(it.productId);
+            if(p){ adjustStock(p, kind==='sales'? it.qty : -it.qty); }
+          });
+          inv.items.forEach(it=>{ logStockMove(it.productId, (kind==='sales'?it.qty:-it.qty), (kind==='sales'?'sale_delete':'purchase_delete'), inv.number, 'حذف فاتورة'); });
+        }
       }
       DB[kind] = list.filter(i=>i.id!==id);
       persist(kind); persist('products');
@@ -4646,16 +4837,15 @@ function approvePurchaseInvoice(id){
   if(!checkPeriodLock(inv.date)) return;
   const orphan = inv.items.find(it=>!productById(it.productId));
   if(orphan){ toast('لا يمكن الاعتماد: الصنف "'+orphan.name+'" مرتبط بمنتج محذوف أو غير موجود حالياً'); return; }
-  confirmAction('اعتماد فاتورة الشراء', 'سيتم تحريك المخزون وترحيل القيد المحاسبي فوراً. هل أنت متأكد؟', ()=>{
+  confirmAction('اعتماد فاتورة الشراء', 'سيتم ترحيل الالتزام المالي للمورد فوراً - المخزون مش هيتحرك إلا بعد تأكيد استلام البضاعة فعلياً في المخزن. هل أنت متأكد؟', ()=>{
     inv.status = 'approved'; inv.approvedBy = currentUserName(); inv.approvedAt = Date.now();
     const supplier = supplierById(inv.partyId);
-    inv.items.forEach(it=>{ const p = productById(it.productId); adjustStock(p, it.qty); p.purchasePrice = it.price*(inv.exchangeRate||1); });
     const lines = [
-      {accountId:'acc_inventory', debit:inv.subtotal-inv.discountAmount, credit:0},
+      {accountId:'acc_goods_transit', debit:inv.subtotal-inv.discountAmount, credit:0},
       {accountId:'acc_ap', debit:0, credit:inv.total, partyType:'supplier', partyId:inv.partyId, partyName:inv.partyName},
     ];
     if(inv.taxAmount>0) lines.push({accountId:'acc_vat_in', debit:inv.taxAmount, credit:0});
-    postJournal(inv.date, 'فاتورة شراء '+inv.number+' - '+inv.partyName, lines, 'purchase_invoice', inv.id, 'invoice_main');
+    postJournal(inv.date, 'فاتورة شراء '+inv.number+' - '+inv.partyName+' (بضاعة بالطريق)', lines, 'purchase_invoice', inv.id, 'invoice_main');
     const cashAcc = inv._cashAcc || 'acc_cash';
     const advUse = inv._advUse || 0;
     const paid = Math.max(0, inv.paidAmount - advUse);
@@ -4672,10 +4862,93 @@ function approvePurchaseInvoice(id){
       ], 'purchase_invoice', inv.id, 'advance_use');
     }
     delete inv._cashAcc; delete inv._advUse;
+    persist('purchases');
+    logActivity('purchase_approve', 'اعتماد فاتورة شراء '+inv.number+' بقيمة '+money(inv.total)+' (بانتظار استلام البضاعة بالمخزن)');
+    closeModal(); render(); toast('تم الاعتماد - بانتظار تأكيد الاستلام بالمخزن عشان يتحرك المخزون');
+  });
+}
+function openReceivingReviewModal(id){
+  if(!requirePerm('approve_invoices','مراجعة استلام البضاعة')) return;
+  const inv = DB.purchases.find(i=>i.id===id);
+  if(!inv || (inv.status||'approved')!=='approved' || inv.received) return;
+  const orphan = inv.items.find(it=>!productById(it.productId));
+  if(orphan){ toast('لا يمكن مراجعة الاستلام: الصنف "'+orphan.name+'" مرتبط بمنتج محذوف أو غير موجود حالياً'); return; }
+  const rows = inv.items.map((it,idx)=>`
+    <tr>
+      <td>${esc(it.name)}</td>
+      <td class="tnum">${fmt(it.qty)}</td>
+      <td><input type="number" min="0" step="0.01" value="${it.qty}" id="recv_qty_${idx}" class="tnum" oninput="updateReceivingRowFlag(${idx})" style="width:100px;"></td>
+      <td id="recv_flag_${idx}" class="tnum"></td>
+    </tr>`).join('');
+  const body = `
+    <div class="alert-bar">${icon('alert')}<div>راجع العدد اللي وصل فعلياً بالمخزن لكل صنف. لو العدد مختلف عن المطلوب، الفرق هيتسجل كـ"فروقات استلام مشتريات" تلقائياً.</div></div>
+    <p style="font-size:12.5px;color:var(--text-muted);">فاتورة ${inv.number} - ${esc(inv.partyName)}</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>الصنف</th><th>الكمية المطلوبة</th><th>الكمية الفعلية المستلمة</th><th>الفرق</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="field" style="margin-top:10px;"><label>ملاحظات المخزن (اختياري)</label><input id="f_recv_notes" placeholder="مثال: صنف واحد وصل تالف..."></div>
+  `;
+  openModal('مراجعة استلام فاتورة شراء '+inv.number, body, ()=>{
+    const actualQtys = inv.items.map((it,idx)=>{
+      const v = parseFloat(document.getElementById('recv_qty_'+idx).value);
+      return isNaN(v)||v<0 ? null : v;
+    });
+    if(actualQtys.some(v=>v===null)){ toast('أدخل كمية صحيحة لكل صنف'); return false; }
+    const notes = document.getElementById('f_recv_notes').value.trim();
+    submitGoodsReceipt(inv.id, actualQtys, notes);
+  });
+  setTimeout(()=>{ inv.items.forEach((it,idx)=>updateReceivingRowFlag(idx)); }, 0);
+}
+function updateReceivingRowFlag(idx){
+  const qtyInput = document.getElementById('recv_qty_'+idx);
+  const flagEl = document.getElementById('recv_flag_'+idx);
+  if(!qtyInput || !flagEl) return;
+  const row = document.querySelectorAll('#modalBody table tbody tr')[idx];
+  const expected = parseFloat(row.children[1].textContent.replace(/,/g,''))||0;
+  const actual = parseFloat(qtyInput.value)||0;
+  const diff = actual - expected;
+  if(Math.abs(diff)<0.009){ flagEl.innerHTML = '<span class="badge ok">مطابق</span>'; }
+  else if(diff<0){ flagEl.innerHTML = '<span class="badge low">أقل بـ'+fmt(Math.abs(diff))+'</span>'; }
+  else{ flagEl.innerHTML = '<span class="badge partial">أكتر بـ'+fmt(diff)+'</span>'; }
+}
+function submitGoodsReceipt(id, actualQtys, notes){
+  if(!requirePerm('approve_invoices','تأكيد استلام البضاعة')) return;
+  const inv = DB.purchases.find(i=>i.id===id);
+  if(!inv || (inv.status||'approved')!=='approved' || inv.received) return;
+  if(!checkPeriodLock(inv.date)) return;
+  const orphan = inv.items.find(it=>!productById(it.productId));
+  if(orphan){ toast('لا يمكن تأكيد الاستلام: الصنف "'+orphan.name+'" مرتبط بمنتج محذوف أو غير موجود حالياً'); return; }
+  confirmAction('تأكيد استلام البضاعة', 'سيتم إضافة الأعداد الفعلية اللي راجعتها لمخزونك ومعالجة أي فروقات محاسبياً. هل أنت متأكد؟', ()=>{
+    inv.received = true; inv.receivedBy = currentUserName(); inv.receivedAt = Date.now();
+    if(notes) inv.receivingNotes = notes;
+    let totalTransitReverse = 0, totalToInventory = 0, totalDiscrepancy = 0;
+    const varianceLines = [];
+    inv.items.forEach((it,idx)=>{
+      const actualQty = actualQtys[idx];
+      const p = productById(it.productId);
+      const unitPrice = it.price*(inv.exchangeRate||1);
+      adjustStock(p, actualQty);
+      p.purchasePrice = unitPrice;
+      logStockMove(it.productId, actualQty, 'purchase', inv.number, 'استلام فاتورة شراء بالمخزن'+(actualQty!==it.qty?' (مطلوب '+it.qty+')':''));
+      it.actualReceivedQty = actualQty;
+      const expectedValue = it.qty * unitPrice;
+      const actualValue = actualQty * unitPrice;
+      totalTransitReverse += expectedValue;
+      totalToInventory += actualValue;
+      if(Math.abs(actualQty-it.qty)>0.009){
+        totalDiscrepancy += (actualValue-expectedValue);
+        varianceLines.push(it.name+': مطلوب '+fmt(it.qty)+' - مستلم '+fmt(actualQty));
+      }
+    });
     persist('purchases'); persist('products');
-    logActivity('purchase_approve', 'اعتماد فاتورة شراء '+inv.number+' بقيمة '+money(inv.total));
-    inv.items.forEach(it=>{ logStockMove(it.productId, it.qty, 'purchase', inv.number, 'فاتورة شراء'); });
-    closeModal(); render(); toast('تم الاعتماد والترحيل بنجاح');
+    const lines = [{accountId:'acc_inventory', debit:totalToInventory, credit:0}];
+    if(totalDiscrepancy<0){ lines.push({accountId:'acc_recv_discrepancy', debit:-totalDiscrepancy, credit:0}); }
+    lines.push({accountId:'acc_goods_transit', debit:0, credit:totalTransitReverse});
+    if(totalDiscrepancy>0){ lines.push({accountId:'acc_recv_discrepancy', debit:0, credit:totalDiscrepancy}); }
+    postJournal(inv.date, 'استلام بضاعة فاتورة شراء '+inv.number+' بالمخزن'+(varianceLines.length>0?' (فروقات: '+varianceLines.join('، ')+')':''), lines, 'purchase_receive', inv.id);
+    logActivity('purchase_approve', 'تأكيد استلام بضاعة فاتورة شراء '+inv.number+' بالمخزن'+(varianceLines.length>0?' - فيه فروقات في '+varianceLines.length+' صنف':''));
+    closeModal(); render(); toast('تم تأكيد الاستلام - المخزون اتحدث'+(varianceLines.length>0?' وتم تسجيل الفروقات':''));
   });
 }
 function rejectPurchaseInvoice(id){
@@ -4738,6 +5011,7 @@ function openReturnModal(kind, invoiceId){
   const inv = DB[kind].find(i=>i.id===invoiceId);
   if(!inv) return;
   if((inv.status||'approved')!=='approved'){ toast('الفاتورة دي لسه مش معتمدة - لازم تعتمدها الأول قبل عمل مرتجع عليها'); return; }
+  if(kind==='purchases' && !inv.received){ toast('البضاعة دي لسه مستلمتش بالمخزن - لازم تأكد الاستلام الأول قبل عمل مرتجع عليها'); return; }
   const isSale = kind==='sales';
   const rows = inv.items.map(it=>{
     const already = returnedQtyForItem(invoiceId, it.productId);
@@ -4857,7 +5131,7 @@ function openQuotationModal(){
   const body = `
     <div class="row2">
       <div class="field"><label>${lbl('العميل *','Customer *')}</label>
-        <select id="f_party">${DB.customers.length? '<option value="">اختر عميل...</option>'+customersOpts : '<option value="">لا يوجد عملاء - أضف عميل أولاً</option>'}</select>
+        <select id="f_party" onchange="onSalePartyChange()">${DB.customers.length? '<option value="">اختر عميل...</option>'+customersOpts : '<option value="">لا يوجد عملاء - أضف عميل أولاً</option>'}</select>
         ${quickAddPartyHtml('customers')}
       </div>
       <div class="field"><label>${lbl('صالح حتى','Valid Until')}</label><input id="f_valid" type="date" value="${addDays(todayISO(),14)}"></div>
@@ -5906,15 +6180,16 @@ function renderPurchases(){
           <tr>
             <td>${s.number}</td><td>${esc(s.partyName)}</td><td>${fmtDate(s.date)}</td><td>${s.dueDate?fmtDate(s.dueDate):'-'}</td><td>${s.items.length}</td>
             <td class="tnum">${money(s.total)}${s.currency&&s.currency!==DB.settings.currency?`<br><span style="font-size:10.5px;color:var(--text-muted);">(${fmt(s.originalTotal)} ${esc(s.currency)})</span>`:''}</td><td class="tnum">${money(s.paidAmount)}</td>
-            <td class="tnum">${money(s.total-s.paidAmount)}</td><td>${statusBadge(s)}${isOverdue(s)?' <span class="badge low">متأخرة</span>':''}</td>
+            <td class="tnum">${money(s.total-s.paidAmount)}</td><td>${(s.status||'approved')==='approved'&&!s.received?'<span class="badge partial">بانتظار الاستلام</span>':statusBadge(s)}${isOverdue(s)?' <span class="badge low">متأخرة</span>':''}</td>
             <td>
               <button class="btn btn-outline btn-icon btn-sm" onclick="printInvoice('purchases','${s.id}')" title="طباعة">${icon('printer')}</button>
               ${commentsButtonHtml('purchase', s.id)}
               <button class="btn btn-outline btn-icon btn-sm" onclick="openPurchaseModal('${s.id}')" title="تعديل">${icon('edit')}</button>
               <button class="btn btn-outline btn-icon btn-sm" onclick="duplicatePurchaseInvoice('${s.id}')" title="نسخ الفاتورة">${icon('duplicate')}</button>
+              ${((s.status||'approved')==='approved'&&!s.received&&can('approve_invoices'))?`<button class="btn btn-outline btn-sm" onclick="goTo('purchasereceiving')" title="استلام البضاعة من صفحة استلام المشتريات بالمخزون">${icon('inventory')} استلامها من المخزون</button>`:''}
               ${((s.status||'approved')==='approved')?`
-              <button class="btn btn-outline btn-icon btn-sm" onclick="openReturnModal('purchases','${s.id}')" title="مرتجع">${icon('undo')}</button>
-              <button class="btn btn-outline btn-sm" onclick="printReceivingNote('${s.id}')" title="إذن استلام بضاعة">${icon('inventory')} إذن استلام</button>
+              ${s.received?`<button class="btn btn-outline btn-icon btn-sm" onclick="openReturnModal('purchases','${s.id}')" title="مرتجع">${icon('undo')}</button>
+              <button class="btn btn-outline btn-sm" onclick="printReceivingNote('${s.id}')" title="إذن استلام بضاعة">${icon('inventory')} إذن استلام</button>`:''}
               ${s.total-s.paidAmount>0.009?`<button class="btn btn-outline btn-sm" onclick="openPaymentModal('purchases','${s.id}')">${icon('money')} دفع</button>`:''}
               `:''}
               ${((s.status||'approved')==='pending' && can('approve_invoices'))?`
@@ -6017,9 +6292,13 @@ function deleteSelectedProducts(){
   confirmAction('حذف '+ids.length+' منتج', usedIds.length>0 ? (usedIds.length+' من المنتجات المحددة مستخدمة في فواتير موجودة ولن تُحذف. سيتم حذف الباقي فقط. متابعة؟') : 'هل أنت متأكد من حذف المنتجات المحددة؟', ()=>{
     let deleted=0;
     ids.forEach(id=>{
-      if(!usedIds.includes(id)){ DB.products = DB.products.filter(p=>p.id!==id); deleted++; }
+      if(!usedIds.includes(id)){
+        DB.products = DB.products.filter(p=>p.id!==id);
+        DB.priceLists.forEach(pl=>{ if(pl.prices && pl.prices[id]!=null) delete pl.prices[id]; });
+        deleted++;
+      }
     });
-    persist('products');
+    persist('products'); persist('priceLists');
     selectedProducts.clear();
     logActivity('product_delete', 'حذف جماعي لـ '+deleted+' منتج');
     closeModal(); render(); toast('تم حذف '+deleted+' منتج');
@@ -7300,7 +7579,7 @@ function renderCustodyTab(){
             <td>${c.number}</td><td>${esc(c.holderName)}</td><td class="tnum">${money(c.initialAmount)}</td>
             <td class="tnum" style="font-weight:700;color:${bal>0?'var(--success)':'var(--text-muted)'};">${money(bal)}</td>
             <td>${c.status==='active'?'<span class="badge ok">نشطة</span>':'<span class="badge unpaid">مقفولة</span>'}${pending>0?' <span class="badge partial">'+pending+' بانتظار الموافقة</span>':''}</td>
-            <td><button class="btn btn-outline btn-sm" onclick="openCustodyDetail('${c.id}')">${icon('statement')} التفاصيل</button></td>
+            <td><button class="btn btn-outline btn-sm" onclick="openCustodyDetail('${c.id}')">${icon('statement')} التفاصيل</button>${(c.status==='closed' && can('delete_invoices'))?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteCustody('${c.id}')">${icon('trash')}</button>`:''}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`}
@@ -7378,6 +7657,7 @@ function openCustodyDetail(custodyId){
       <button class="btn btn-outline btn-sm" onclick="closeModal(); openCustodyEntryModal('${custodyId}','topup');">${icon('plus')} تعزيز العهدة</button>
       <button class="btn btn-outline btn-sm" onclick="closeModal(); openCustodyEntryModal('${custodyId}','return');">${icon('undo')} إرجاع من العهدة</button>
       ${c.status==='active'?`<button class="btn btn-danger-o btn-sm" onclick="closeCustody('${custodyId}')">${icon('close')} إقفال العهدة</button>`:''}
+      ${(c.status==='closed' && can('delete_invoices'))?`<button class="btn btn-danger-o btn-sm" onclick="deleteCustody('${custodyId}')">${icon('trash')} حذف العهدة</button>`:''}
     </div>
     <h3 style="font-size:13.5px;color:var(--primary-dark);">سجل حركات العهدة</h3>
     ${entries.length===0?`<p style="font-size:12.5px;color:var(--text-muted);">لا توجد حركات بعد.</p>`:`
@@ -7407,44 +7687,85 @@ function openCustodyEntryModal(custodyId, type){
   if(!c) return;
   const bal = custodyBalance(custodyId);
   const expAccs = DB.accounts.filter(a=>a.type==='expense' && (a.id==='acc_expense' || a.id==='acc_opex' || a.id==='acc_mkt_commission' || a.code==='5600'));
+  window._custodyExpAccOpts = expAccs.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
   const isExpense = type==='expense';
   const isReturn = type==='return';
   const titleMap = {expense:'تسجيل مصروف من العهدة', topup:'تعزيز العهدة', return:'إرجاع من العهدة'};
   const body = `
     ${(isExpense||isReturn)?`<p style="font-size:12px;color:var(--text-muted);margin:0 0 8px 0;">الرصيد الحالي بيد ${esc(c.holderName)}: <b>${money(bal)}</b></p>`:''}
-    ${isExpense?`<div class="field"><label>حساب المصروف</label><select id="f_acc">${expAccs.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div>`:''}
-    <div class="row2">
+    ${!isExpense?`<div class="row2">
       <div class="field"><label>المبلغ *</label><input id="f_amt" type="number" step="0.01" min="0" value="0"></div>
       <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${todayISO()}"></div>
+    </div>`:`<div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${todayISO()}"></div>
+    <label>بنود المصروفات</label>
+    <div class="item-rows" id="custodyExpRows">
+      <div class="item-row head-row" style="grid-template-columns:1.6fr 2fr .9fr 34px;"><div>حساب المصروف</div><div>البيان</div><div>المبلغ</div><div></div></div>
     </div>
-    ${(type==='topup')?`<div class="field"><label>الخزينة / الحساب البنكي المصروف منه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>`:''}
-    ${isReturn?`<div class="field"><label>الخزينة / الحساب البنكي المرتجع إليه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>`:''}
-    <div class="field"><label>البيان</label><input id="f_memo" placeholder="${isExpense?'مثال: بنزين السيارة':(type==='topup'?'مثال: تعزيز شهري':'مثال: إرجاع باقي العهدة')}"></div>
-    ${isExpense?`<div class="field">
+    <button class="btn btn-outline btn-sm" type="button" onclick="addCustodyExpenseRow()">${icon('plus')} إضافة مصروف تاني من نفس العهدة</button>`}
+    ${(type==='topup')?`<div class="field" style="margin-top:10px;"><label>الخزينة / الحساب البنكي المصروف منه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>`:''}
+    ${isReturn?`<div class="field" style="margin-top:10px;"><label>الخزينة / الحساب البنكي المرتجع إليه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>`:''}
+    ${!isExpense?`<div class="field" style="margin-top:10px;"><label>البيان</label><input id="f_memo" placeholder="${type==='topup'?'مثال: تعزيز شهري':'مثال: إرجاع باقي العهدة'}"></div>`:''}
+    ${isExpense?`<div class="field" style="margin-top:10px;">
       <label>مرفق (إيصال) - اختياري</label>
       <div id="custodyAttachPreview" style="margin-bottom:8px;"></div>
       <input type="file" id="f_attach" accept="image/*,.pdf" onchange="onCustodyAttachSelected(event)">
     </div>`:''}
   `;
   openModal(titleMap[type], body, ()=>{
-    const amt = parseFloat(document.getElementById('f_amt').value)||0;
-    if(amt<=0){ toast('أدخل مبلغ صحيح'); return false; }
-    if((isExpense||isReturn) && amt>bal+0.009){ toast('المبلغ أكبر من رصيد العهدة الحالي ('+money(bal)+')'); return false; }
     const date = document.getElementById('f_date').value || todayISO();
-    const memo = document.getElementById('f_memo').value.trim() || (titleMap[type]);
-    const accountId = isExpense ? document.getElementById('f_acc').value : null;
-    const cashAccEl = document.getElementById('f_cashacc');
-    const cashAccountId = cashAccEl ? cashAccEl.value : null;
     if(!checkPeriodLock(date)) return false;
+    if(!isExpense){
+      const amt = parseFloat(document.getElementById('f_amt').value)||0;
+      if(amt<=0){ toast('أدخل مبلغ صحيح'); return false; }
+      if(isReturn && amt>bal+0.009){ toast('المبلغ أكبر من رصيد العهدة الحالي ('+money(bal)+')'); return false; }
+      const memo = document.getElementById('f_memo').value.trim() || (titleMap[type]);
+      const cashAccountId = document.getElementById('f_cashacc').value;
+      const entry = { id:uid(), custodyId, type, date, amount:amt, accountId:null, memo, cashAccountId, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
+      DB.custodyEntries.push(entry);
+      persist('custodyEntries');
+      logActivity('custody', CUSTODY_ENTRY_LABELS[type]+' لعهدة '+c.number+' بمبلغ '+money(amt)+' (بانتظار الموافقة)');
+      closeModal(); render(); toast('تم الحفظ بانتظار الموافقة');
+      return;
+    }
+    const rows = Array.from(document.querySelectorAll('#custodyExpRows .item-row:not(.head-row)'));
+    const lines = [];
+    rows.forEach(row=>{
+      const accId = row.querySelector('.cexp-acc').value;
+      const amt = parseFloat(row.querySelector('.cexp-amt').value)||0;
+      const memo = row.querySelector('.cexp-memo').value.trim();
+      if(accId && amt>0) lines.push({accId, amt, memo:memo||'مصروف'});
+    });
+    if(lines.length===0){ toast('أدخل بيانات صحيحة لبند واحد على الأقل'); return false; }
+    const totalAmt = lines.reduce((s,l)=>s+l.amt,0);
+    if(totalAmt>bal+0.009){ toast('إجمالي المبالغ ('+money(totalAmt)+') أكبر من رصيد العهدة الحالي ('+money(bal)+')'); return false; }
     const attachment = window._newCustodyAttachment;
     const attachmentName = window._newCustodyAttachmentName;
     window._newCustodyAttachment = undefined; window._newCustodyAttachmentName = undefined;
-    const entry = { id:uid(), custodyId, type, date, amount:amt, accountId, memo, cashAccountId, attachment, attachmentName, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
-    DB.custodyEntries.push(entry);
+    const batchId = lines.length>1 ? uid() : null;
+    lines.forEach(l=>{
+      const entry = { id:uid(), custodyId, type, date, amount:l.amt, accountId:l.accId, memo:l.memo, cashAccountId:null, attachment, attachmentName, batchId, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
+      DB.custodyEntries.push(entry);
+    });
     persist('custodyEntries');
-    logActivity('custody', CUSTODY_ENTRY_LABELS[type]+' لعهدة '+c.number+' بمبلغ '+money(amt)+' (بانتظار الموافقة)');
-    closeModal(); render(); toast('تم الحفظ بانتظار الموافقة');
+    logActivity('custody', lines.length>1?('تسجيل '+lines.length+' مصروف من عهدة '+c.number+' بإجمالي '+money(totalAmt)+' (بانتظار الموافقة)'):(CUSTODY_ENTRY_LABELS.expense+' لعهدة '+c.number+' بمبلغ '+money(lines[0].amt)+' (بانتظار الموافقة)'));
+    closeModal(); render(); toast(lines.length>1?('تم حفظ '+lines.length+' مصروف بانتظار الموافقة'):'تم الحفظ بانتظار الموافقة');
   });
+  if(isExpense) addCustodyExpenseRow();
+}
+function addCustodyExpenseRow(){
+  const wrap = document.getElementById('custodyExpRows');
+  const rowId = 'custodyexprow_'+uid();
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  div.id = rowId;
+  div.style.gridTemplateColumns = '1.6fr 2fr .9fr 34px';
+  div.innerHTML = `
+    <select class="cexp-acc">${window._custodyExpAccOpts}</select>
+    <input class="cexp-memo" placeholder="مثال: بنزين السيارة">
+    <input class="cexp-amt" type="number" step="0.01" value="0">
+    <button class="rm-btn" type="button" onclick="document.getElementById('${rowId}').remove();">${icon('close')}</button>
+  `;
+  wrap.appendChild(div);
 }
 function onCustodyAttachSelected(ev){
   const file = ev.target.files[0];
@@ -7529,6 +7850,21 @@ function closeCustody(custodyId){
     persist('custodies');
     logActivity('custody', 'إقفال عهدة '+c.number+' - '+c.holderName);
     closeModal(); render(); toast('تم الإقفال');
+  });
+}
+function deleteCustody(custodyId){
+  if(!requirePerm('delete_invoices','حذف العهد')) return;
+  const c = DB.custodies.find(x=>x.id===custodyId);
+  if(!c) return;
+  if(c.status!=='closed'){ toast('لازم تقفل العهدة الأول قبل ما تقدر تحذفها'); return; }
+  const pendingCount = DB.custodyEntries.filter(e=>e.custodyId===custodyId && e.status==='pending').length;
+  if(pendingCount>0){ toast('فيه '+pendingCount+' حركة بانتظار الموافقة لسه على العهدة دي - اعتمدها أو ارفضها الأول'); return; }
+  confirmAction('حذف العهدة', 'هيتم حذف العهدة "'+c.number+'" - '+c.holderName+' من القائمة. القيود المحاسبية المرحّلة فعلاً هتفضل زي ما هي. هل أنت متأكد؟', ()=>{
+    DB.custodies = DB.custodies.filter(x=>x.id!==custodyId);
+    DB.custodyEntries = DB.custodyEntries.filter(e=>e.custodyId!==custodyId);
+    persist('custodies'); persist('custodyEntries');
+    logActivity('custody', 'حذف عهدة '+c.number+' - '+c.holderName);
+    closeModal(); render(); toast('تم الحذف');
   });
 }
 function openCapitalModal(){
@@ -7703,6 +8039,10 @@ function renderHealthCheckPage(){
   const oldPendingPurch = DB.purchases.filter(s=>s.status==='pending' && s.createdAt<cutoff).length;
   const totalOldPending = oldPendingExp+oldPendingShip+oldPendingTester+oldPendingSales+oldPendingPurch;
   checks.push({label:'موافقات معلّقة من أكتر من أسبوع', ok:totalOldPending===0, detail:totalOldPending+' مستند لسه بانتظار الموافقة (مصروفات: '+oldPendingExp+', أمانة: '+oldPendingShip+', تسترز: '+oldPendingTester+', فواتير بيع: '+oldPendingSales+', فواتير شراء: '+oldPendingPurch+')', severity:'warning'});
+
+  const goodsInTransit = DB.purchases.filter(s=>(s.status||'approved')==='approved' && !s.received);
+  const oldGoodsInTransit = goodsInTransit.filter(s=>(s.approvedAt||s.createdAt)<cutoff);
+  checks.push({label:'بضاعة معتمدة ولسه مستلمتش بالمخزن من أكتر من أسبوع', ok:oldGoodsInTransit.length===0, detail:oldGoodsInTransit.length+' فاتورة شراء: '+oldGoodsInTransit.slice(0,5).map(s=>s.number).join('، '), severity:'warning', action:oldGoodsInTransit.length>0?()=>goTo('purchasereceiving'):null});
 
   // 5. Negative stock
   const negStock = DB.products.filter(p=>p.quantity<-0.009);
@@ -7930,9 +8270,10 @@ function renderSettings(){
         <b>ملحوظة مهمة:</b> النسخ بيحصل بس وقت ما تفتح النظام فعلياً — مفيش أي نسخ بيحصل والجهاز أو المتصفح مقفول.
       </p>
       <div id="backupFolderStatus" style="margin-bottom:12px;">${(()=>{
-        let folderName='', lastBackup=0;
-        try{ folderName = localStorage.getItem('zib_backup_folder_name')||''; lastBackup = parseInt(localStorage.getItem('zib_last_backup')||'0'); }catch(e){}
+        let folderName='', lastBackup=0, needsPerm=false;
+        try{ folderName = localStorage.getItem('zib_backup_folder_name')||''; lastBackup = parseInt(localStorage.getItem('zib_last_backup')||'0'); needsPerm = localStorage.getItem('zib_backup_needs_permission')==='1'; }catch(e){}
         if(!folderName) return `<div style="padding:10px 14px;background:var(--warning-bg);border-radius:10px;font-size:13px;color:#8A5A0A;">${icon('alert')} لسه ماخترتش مجلد للنسخ الاحتياطي التلقائي.</div>`;
+        if(needsPerm) return `<div style="padding:10px 14px;background:var(--danger-bg);border-radius:10px;font-size:13px;color:var(--danger);">${icon('alert')} المتصفح محتاج تأكيد إذن الوصول للمجلد "<b>${esc(folderName)}</b>" تاني (بيحصل ده أحياناً بعد إغلاق المتصفح أو إعادة تشغيله). دوس "نسخ احتياطي الآن" تحت عشان تجدد الإذن ويرجع النسخ التلقائي يشتغل.</div>`;
         if(!lastBackup) return `<div style="padding:10px 14px;background:var(--warning-bg);border-radius:10px;font-size:13px;color:#8A5A0A;">المجلد المختار: <b>${esc(folderName)}</b> — لسه ماخدتش نسخة احتياطية فيه لحد دلوقتي.</div>`;
         const diffMs = Date.now()-lastBackup;
         const diffH = diffMs/3600000;
@@ -7951,6 +8292,17 @@ function renderSettings(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-outline" onclick="pickBackupFolder()">${icon('inventory')} اختيار مجلد النسخ الاحتياطي</button>
         <button class="btn btn-outline" onclick="runAutoBackup(true)">${icon('journal')} نسخ احتياطي الآن</button>
+      </div>
+    </div>`:''}
+    ${(canSettings && isOnlineConfigured() && !LOCAL_MODE)?`
+    <div class="card" style="max-width:520px;">
+      <div class="card-head"><h2>نسخ احتياطي سحابي تلقائي</h2></div>
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px 0;">
+        بيتحفظ تلقائياً جوّه قاعدة بياناتك أونلاين كل يوم تقريباً - <b>مش محتاج أي إذن أو تدخل منك</b>. بيتحفظ آخر 3 نسخ بس وبيتشال الأقدم تلقائياً.
+      </p>
+      <div id="cloudBackupList">${renderCloudBackupList()}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn btn-outline" onclick="runCloudAutoBackup(true)">${icon('journal')} نسخ احتياطي سحابي الآن</button>
       </div>
     </div>`:''}
     ${canSettings?`
@@ -8004,9 +8356,9 @@ function factoryReset(){
   DB.sales = []; DB.purchases = []; DB.returns = []; DB.quotations = [];
   DB.stockMoves = []; DB.consignShipments = []; DB.consignReports = []; DB.testerHandouts = []; DB.expenses = []; DB.productGroups = []; DB.crmActivities = [];
   DB.purchaseOrders = []; DB.warehouses = [{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = []; DB.custodies = []; DB.custodyEntries = []; DB.boms = []; DB.productionOrders = []; DB.landedCosts = []; DB.comments = [];
-  DB.journal = []; DB.activityLog = [];
+  DB.journal = []; DB.activityLog = []; DB.priceLists = [];
   DB.accounts = DEFAULT_ACCOUNTS.map(a=>({...a}));
-  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','journal','activityLog','accounts'].forEach(k=>persist(k));
+  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','journal','activityLog','priceLists','accounts'].forEach(k=>persist(k));
   logActivity('factory_reset', 'تمت استعادة النظام لوضعه الافتراضي بالكامل بواسطة '+resetBy);
   closeModal(); usersLoaded=false; render();
   toast('تم استعادة النظام لوضعه الافتراضي بنجاح');
@@ -8043,7 +8395,7 @@ async function pickBackupFolder(){
   try{
     const handle = await window.showDirectoryPicker({mode:'readwrite'});
     await idbSet('backupDir', handle);
-    try{ localStorage.setItem('zib_backup_folder_name', handle.name); }catch(e){}
+    try{ localStorage.setItem('zib_backup_folder_name', handle.name); localStorage.removeItem('zib_backup_needs_permission'); }catch(e){}
     toast('تم اختيار مجلد النسخ الاحتياطي: '+handle.name);
     await runAutoBackup(true);
     render();
@@ -8052,7 +8404,7 @@ async function pickBackupFolder(){
 function buildBackupObject(){
   return {
     products:DB.products, customers:DB.customers, suppliers:DB.suppliers, sales:DB.sales, purchases:DB.purchases,
-    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, productGroups:DB.productGroups, crmActivities:DB.crmActivities, purchaseOrders:DB.purchaseOrders, warehouses:DB.warehouses, salesReps:DB.salesReps, custodies:DB.custodies, custodyEntries:DB.custodyEntries, boms:DB.boms, productionOrders:DB.productionOrders, landedCosts:DB.landedCosts, comments:DB.comments, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, settings:DB.settings,
+    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, productGroups:DB.productGroups, crmActivities:DB.crmActivities, purchaseOrders:DB.purchaseOrders, warehouses:DB.warehouses, salesReps:DB.salesReps, custodies:DB.custodies, custodyEntries:DB.custodyEntries, boms:DB.boms, productionOrders:DB.productionOrders, landedCosts:DB.landedCosts, comments:DB.comments, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, priceLists:DB.priceLists, settings:DB.settings,
     exportedAt:new Date().toISOString(), version:1
   };
 }
@@ -8062,9 +8414,15 @@ async function runAutoBackup(manual){
     if(!handle){ if(manual) toast('اختر مجلد النسخ الاحتياطي أولاً'); return; }
     let perm = await handle.queryPermission({mode:'readwrite'});
     if(perm!=='granted'){
+      if(!manual){
+        try{ localStorage.setItem('zib_backup_needs_permission','1'); }catch(e){}
+        if(VIEW==='settings') render();
+        return;
+      }
       perm = await handle.requestPermission({mode:'readwrite'});
-      if(perm!=='granted'){ if(manual) toast('لم يتم منح إذن الكتابة للمجلد'); return; }
+      if(perm!=='granted'){ toast('لم يتم منح إذن الكتابة للمجلد'); return; }
     }
+    try{ localStorage.removeItem('zib_backup_needs_permission'); }catch(e){}
     const fileName = 'zib-auto-backup-'+todayISO()+'.json';
     const fileHandle = await handle.getFileHandle(fileName, {create:true});
     const writable = await fileHandle.createWritable();
@@ -8076,8 +8434,16 @@ async function runAutoBackup(manual){
   }catch(e){ console.error('Auto backup failed', e); if(manual) toast('فشل أخذ النسخة الاحتياطية - جرب تختار المجلد تاني'); }
 }
 function autoBackupOnLoad(){
-  idbGet('backupDir').then(handle=>{
+  idbGet('backupDir').then(async handle=>{
     if(!handle) return;
+    const perm = await handle.queryPermission({mode:'readwrite'});
+    if(perm==='granted'){
+      try{ localStorage.removeItem('zib_backup_needs_permission'); }catch(e){}
+    }else{
+      try{ localStorage.setItem('zib_backup_needs_permission','1'); }catch(e){}
+      if(VIEW==='settings') render();
+      return;
+    }
     let lastBackup = 0;
     try{ lastBackup = parseInt(localStorage.getItem('zib_last_backup')||'0'); }catch(e){}
     const hoursSince = (Date.now()-lastBackup)/3600000;
@@ -8094,6 +8460,79 @@ function downloadBackup(){
   logActivity('backup', 'تنزيل نسخة احتياطية');
   toast('تم تنزيل النسخة الاحتياطية');
 }
+let _cloudBackupMetaCache = null;
+let _cloudBackupMetaLoading = false;
+function renderCloudBackupList(){
+  if(_cloudBackupMetaCache===null){
+    if(!_cloudBackupMetaLoading){
+      _cloudBackupMetaLoading = true;
+      loadKey('zib_cloud_backup_meta', {entries:[]}).then(meta=>{
+        _cloudBackupMetaCache = meta || {entries:[]};
+        _cloudBackupMetaLoading = false;
+        if(VIEW==='settings') render();
+      }).catch(()=>{ _cloudBackupMetaCache = {entries:[]}; _cloudBackupMetaLoading=false; if(VIEW==='settings') render(); });
+    }
+    return `<p style="font-size:12.5px;color:var(--text-muted);">جاري تحميل قائمة النسخ...</p>`;
+  }
+  const entries = [...(_cloudBackupMetaCache.entries||[])].sort((a,b)=>b.timestamp-a.timestamp);
+  if(entries.length===0) return `<p style="font-size:12.5px;color:var(--text-muted);">لسه معملتش أي نسخة احتياطية سحابية.</p>`;
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>التاريخ</th><th></th></tr></thead>
+    <tbody>${entries.map(e=>`<tr><td>${new Date(e.timestamp).toLocaleString('ar-EG-u-nu-latn',{dateStyle:'medium',timeStyle:'short'})}</td><td><button class="btn btn-outline btn-sm" onclick="restoreCloudBackup(${e.slot})">${icon('undo')} استعادة</button></td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+async function runCloudAutoBackup(manual){
+  if(!isOnlineConfigured() || LOCAL_MODE){ if(manual) toast('النسخ الاحتياطي السحابي متاح بس لما النظام متصل بقاعدة بيانات أونلاين'); return; }
+  try{
+    const meta = (await loadKey('zib_cloud_backup_meta', {entries:[]})) || {entries:[]};
+    let entries = meta.entries||[];
+    let slot;
+    if(entries.length<3){
+      const usedSlots = entries.map(e=>e.slot);
+      slot = [0,1,2].find(s=>!usedSlots.includes(s));
+    }else{
+      entries.sort((a,b)=>a.timestamp-b.timestamp);
+      slot = entries[0].slot;
+      entries = entries.slice(1);
+    }
+    await saveKey('zib_cloud_backup_'+slot, buildBackupObject());
+    entries.push({slot, timestamp:Date.now()});
+    await saveKey('zib_cloud_backup_meta', {entries});
+    try{ localStorage.setItem('zib_last_cloud_backup', String(Date.now())); }catch(e){}
+    _cloudBackupMetaCache = null;
+    if(manual){ toast('تم أخذ نسخة احتياطية سحابية بنجاح'); render(); }
+  }catch(e){ console.error('Cloud auto backup failed', e); if(manual) toast('فشل أخذ النسخة الاحتياطية السحابية'); }
+}
+function cloudAutoBackupOnLoad(){
+  if(!isOnlineConfigured() || LOCAL_MODE) return;
+  let lastBackup = 0;
+  try{ lastBackup = parseInt(localStorage.getItem('zib_last_cloud_backup')||'0'); }catch(e){}
+  const hoursSince = (Date.now()-lastBackup)/3600000;
+  if(hoursSince>=20) runCloudAutoBackup(false);
+}
+async function restoreCloudBackup(slot){
+  if(!requirePerm('manage_settings','استعادة نسخة احتياطية')) return;
+  try{
+    const data = await loadKey('zib_cloud_backup_'+slot, null);
+    if(!data){ toast('تعذر تحميل النسخة الاحتياطية'); return; }
+    confirmAction('استعادة نسخة احتياطية سحابية', 'سيتم استبدال كل البيانات الحالية بالكامل بهذه النسخة. هل أنت متأكد؟', ()=>{
+      applyBackupData(data, 'سحابية');
+    });
+  }catch(e){ toast('تعذر تحميل النسخة الاحتياطية'); }
+}
+function applyBackupData(data, sourceLabel){
+  DB.products = data.products||[]; DB.customers = data.customers||[]; DB.suppliers = data.suppliers||[];
+  DB.sales = data.sales||[]; DB.purchases = data.purchases||[]; DB.returns = data.returns||[]; DB.quotations = data.quotations||[];
+  DB.stockMoves = data.stockMoves||[]; DB.consignShipments = data.consignShipments||[]; DB.consignReports = data.consignReports||[];
+  DB.testerHandouts = data.testerHandouts||[]; DB.expenses = data.expenses||[]; DB.productGroups = data.productGroups||[]; DB.crmActivities = data.crmActivities||[];
+  DB.purchaseOrders = data.purchaseOrders||[]; DB.warehouses = data.warehouses||[{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = data.salesReps||[]; DB.custodies = data.custodies||[]; DB.custodyEntries = data.custodyEntries||[]; DB.boms = data.boms||[]; DB.productionOrders = data.productionOrders||[]; DB.landedCosts = data.landedCosts||[]; DB.comments = data.comments||[];
+  DB.accounts = data.accounts||DEFAULT_ACCOUNTS.map(a=>({...a})); DB.journal = data.journal||[];
+  DB.activityLog = data.activityLog||[]; DB.priceLists = data.priceLists||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0};
+  ensureDefaultAccounts();
+  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','accounts','journal','activityLog','priceLists','settings'].forEach(k=>persist(k));
+  logActivity('restore', 'استعادة نسخة احتياطية '+(sourceLabel||'من ملف'));
+  closeModal(); usersLoaded=false; render(); toast('تم استعادة النسخة الاحتياطية بنجاح');
+}
 function restoreBackup(ev){
   if(!requirePerm('manage_settings','استعادة نسخة احتياطية')) return;
   const file = ev.target.files[0];
@@ -8103,17 +8542,7 @@ function restoreBackup(ev){
     let data;
     try{ data = JSON.parse(reader.result); }catch(e){ toast('ملف غير صالح'); return; }
     confirmAction('استعادة نسخة احتياطية', 'سيتم استبدال كل البيانات الحالية بالكامل بالنسخة المحفوظة في الملف. هل أنت متأكد؟', ()=>{
-      DB.products = data.products||[]; DB.customers = data.customers||[]; DB.suppliers = data.suppliers||[];
-      DB.sales = data.sales||[]; DB.purchases = data.purchases||[]; DB.returns = data.returns||[]; DB.quotations = data.quotations||[];
-      DB.stockMoves = data.stockMoves||[]; DB.consignShipments = data.consignShipments||[]; DB.consignReports = data.consignReports||[];
-      DB.testerHandouts = data.testerHandouts||[]; DB.expenses = data.expenses||[]; DB.productGroups = data.productGroups||[]; DB.crmActivities = data.crmActivities||[];
-      DB.purchaseOrders = data.purchaseOrders||[]; DB.warehouses = data.warehouses||[{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = data.salesReps||[]; DB.custodies = data.custodies||[]; DB.custodyEntries = data.custodyEntries||[]; DB.boms = data.boms||[]; DB.productionOrders = data.productionOrders||[]; DB.landedCosts = data.landedCosts||[]; DB.comments = data.comments||[];
-      DB.accounts = data.accounts||DEFAULT_ACCOUNTS.map(a=>({...a})); DB.journal = data.journal||[];
-      DB.activityLog = data.activityLog||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0};
-      ensureDefaultAccounts();
-      ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','accounts','journal','activityLog','settings'].forEach(k=>persist(k));
-      logActivity('restore', 'استعادة نسخة احتياطية من ملف');
-      closeModal(); usersLoaded=false; render(); toast('تم استعادة النسخة الاحتياطية بنجاح');
+      applyBackupData(data, 'من ملف');
     });
   };
   reader.readAsText(file);
@@ -8477,6 +8906,7 @@ async function init(){
     await loadAll();
     render();
     autoBackupOnLoad();
+    cloudAutoBackupOnLoad();
   } finally {
     hideAppLoader();
   }

@@ -590,7 +590,7 @@ const ICON = {
 function icon(name){return ICON[name]||'';}
 
 /* ============ STATE ============ */
-let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], productGroups:[], crmActivities:[], purchaseOrders:[], warehouses:[], salesReps:[], custodies:[], custodyEntries:[], boms:[], productionOrders:[], landedCosts:[], comments:[], accounts:[], journal:[], activityLog:[], priceLists:[], settings:{ companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 } };
+let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], productGroups:[], crmActivities:[], purchaseOrders:[], warehouses:[], salesReps:[], custodies:[], custodyEntries:[], boms:[], productionOrders:[], landedCosts:[], comments:[], accounts:[], journal:[], activityLog:[], priceLists:[], fixedAssets:[], settings:{ companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 } };
 let VIEW = 'dashboard';
 
 /* ============ LANGUAGE (عربي / English) ============ */
@@ -655,6 +655,7 @@ const T = {
   salesreports:{ar:'تقارير المبيعات',en:'Sales Reports'}, salesreports_sub:{ar:'كل التقارير التفصيلية الخاصة بالمبيعات',en:'All detailed sales-specific reports'},
   health:{ar:'فحص صحة النظام',en:'System Health Check'}, health_sub:{ar:'نظرة سريعة على أي حاجة محتاجة انتباه',en:'A quick look at anything that needs attention'},
   activity:{ar:'سجل الحركات',en:'Activity Log'}, activity_sub:{ar:'سجل بكل العمليات ومن قام بها',en:'Log of all actions and who performed them'},
+  fixedassets:{ar:'الأصول الثابتة',en:'Fixed Assets'}, fixedassets_sub:{ar:'الأجهزة والمعدات والأثاث وإهلاكها',en:'Equipment, furniture, and their depreciation'},
   settings:{ar:'الإعدادات',en:'Settings'}, settings_sub:{ar:'بيانات الشركة والإعدادات العامة',en:'Company info and general settings'},
   save:{ar:'حفظ',en:'Save'}, cancel:{ar:'إلغاء',en:'Cancel'}, confirmDelete:{ar:'تأكيد الحذف',en:'Confirm Delete'},
   add:{ar:'إضافة',en:'Add'}, edit:{ar:'تعديل',en:'Edit'}, delete:{ar:'حذف',en:'Delete'}, search:{ar:'بحث...',en:'Search...'},
@@ -705,6 +706,10 @@ const DEFAULT_ACCOUNTS = [
   {id:'acc_wip', code:'1225', name:'أعمال تحت التنفيذ (تصنيع)', type:'asset'},
   {id:'acc_goods_transit', code:'1175', name:'بضاعة بالطريق (مشتريات لم تستلم)', type:'asset'},
   {id:'acc_recv_discrepancy', code:'5600', name:'فروقات استلام المشتريات', type:'expense'},
+  {id:'acc_fixed_assets', code:'1500', name:'الأصول الثابتة', type:'asset'},
+  {id:'acc_accum_depreciation', code:'1510', name:'مجمع إهلاك الأصول الثابتة', type:'asset'},
+  {id:'acc_depreciation_expense', code:'5700', name:'مصروف إهلاك', type:'expense'},
+  {id:'acc_disposal_gain_loss', code:'4900', name:'أرباح وخسائر بيع أصول ثابتة', type:'revenue'},
 ];
 const PAYMENT_TERMS = [
   {id:'immediate', label:'نقداً - فوري', labelEn:'Immediate', days:0},
@@ -722,6 +727,7 @@ function isOverdue(inv){ return inv.dueDate && inv.dueDate < todayISO() && (inv.
 const REPORT_TYPES = [
   {id:'balancesheet', label:'الميزانية العمومية'},
   {id:'income', label:'قائمة الدخل'},
+  {id:'cashflow', label:'قائمة التدفقات النقدية'},
   {id:'trial', label:'ميزان المراجعة'},
   {id:'sales', label:'تقرير المبيعات'},
   {id:'purchases', label:'تقرير المشتريات'},
@@ -753,6 +759,7 @@ const NAV_GROUPS = [
     {id:'reports', icon:'reports', submenu:REPORT_TYPES, tabVar:'reportTab'},
     {id:'health', icon:'alert'},
     {id:'activity', icon:'journal'},
+    {id:'fixedassets', icon:'inventory'},
   ]},
   {group:'grp_sales', items:[
     {id:'quotations', icon:'journal'},
@@ -1042,7 +1049,7 @@ async function testSupaConnection(url,key){
   return true;
 }
 async function loadAll(){
-  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,settings] = await Promise.all([
+  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,fixedAssets,settings] = await Promise.all([
     loadKey('zib_products', []),
     loadKey('zib_customers', []),
     loadKey('zib_suppliers', []),
@@ -1070,9 +1077,10 @@ async function loadAll(){
     loadKey('zib_journal', []),
     loadKey('zib_activity_log', []),
     loadKey('zib_price_lists', []),
+    loadKey('zib_fixed_assets', []),
     loadKey('zib_settings', { companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 }),
   ]);
-  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,settings};
+  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,fixedAssets,settings};
   if(DB.settings.taxRate==null) DB.settings.taxRate = 0;
   if(DB.settings.taxEnabled==null) DB.settings.taxEnabled = false;
   DB_BASELINE = deepClone(DB);
@@ -1126,7 +1134,7 @@ const PERSIST_KEY_MAP = {
   products:'zib_products', customers:'zib_customers', suppliers:'zib_suppliers',
   sales:'zib_sales', purchases:'zib_purchases', returns:'zib_returns', quotations:'zib_quotations', stockMoves:'zib_stock_moves',
   consignShipments:'zib_consign_shipments', consignReports:'zib_consign_reports', testerHandouts:'zib_tester_handouts', expenses:'zib_expenses', productGroups:'zib_product_groups', crmActivities:'zib_crm_activities', purchaseOrders:'zib_purchase_orders', warehouses:'zib_warehouses', salesReps:'zib_sales_reps', custodies:'zib_custodies', custodyEntries:'zib_custody_entries', boms:'zib_boms', productionOrders:'zib_production_orders', landedCosts:'zib_landed_costs', comments:'zib_comments', accounts:'zib_accounts', journal:'zib_journal',
-  activityLog:'zib_activity_log', priceLists:'zib_price_lists', settings:'zib_settings'
+  activityLog:'zib_activity_log', priceLists:'zib_price_lists', fixedAssets:'zib_fixed_assets', settings:'zib_settings'
 };
 function persist(part){
   if(!part) return;
@@ -1408,7 +1416,7 @@ function partyAdvanceBalance(kind, partyId){
 
 /* ============ NAV / RENDER SHELL ============ */
 function navItemAllowed(id){
-  if(id==='accounts'||id==='journal'||id==='reports'||id==='treasury') return can('view_accounting');
+  if(id==='accounts'||id==='journal'||id==='reports'||id==='treasury'||id==='fixedassets') return can('view_accounting');
   if(id==='expenses') return can('view_expenses');
   if(id==='activity') return can('view_activity_log');
   return true;
@@ -1798,7 +1806,7 @@ function render(){
     dashboard: renderDashboard, sales: renderSales, purchases: renderPurchases,
     inventory: renderInventory, customers: ()=>renderParty('customers'),
     suppliers: ()=>renderParty('suppliers'), accounts: renderAccounts, journal: renderJournalPage,
-    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage, health: renderHealthCheckPage, boms: renderBomsPage, production: renderProductionPage, landedcosts: renderLandedCostsPage, purchasereceiving: renderPurchaseReceivingPage, pricelists: renderPriceListsPage
+    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage, health: renderHealthCheckPage, boms: renderBomsPage, production: renderProductionPage, landedcosts: renderLandedCostsPage, purchasereceiving: renderPurchaseReceivingPage, pricelists: renderPriceListsPage, fixedassets: renderFixedAssetsPage
   };
   c.innerHTML = (map[VIEW]||renderDashboard)();
 }
@@ -2552,6 +2560,233 @@ function renderPurchaseReceivingPage(){
     </div>
   `;
 }
+function assetMonthlyDepreciation(asset){
+  if(!asset.usefulLifeYears || asset.usefulLifeYears<=0) return 0;
+  const depreciableAmount = Math.max(0, asset.cost - (asset.salvageValue||0));
+  return depreciableAmount / asset.usefulLifeYears / 12;
+}
+function assetBookValue(asset){
+  return asset.cost - (asset.accumulatedDepreciation||0);
+}
+function renderFixedAssetsPage(){
+  const list = DB.fixedAssets.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  const activeAssets = list.filter(a=>a.status==='approved');
+  const totalCost = activeAssets.reduce((s,a)=>s+a.cost,0);
+  const totalDep = activeAssets.reduce((s,a)=>s+(a.accumulatedDepreciation||0),0);
+  return `
+    <div class="stat-grid" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="lbl">${icon('inventory')} إجمالي تكلفة الأصول النشطة</div><div class="val">${money(totalCost)}</div></div>
+      <div class="stat-card"><div class="lbl">${icon('expense')} مجمع الإهلاك</div><div class="val">${money(totalDep)}</div></div>
+      <div class="stat-card gold"><div class="lbl">${icon('bank')} صافي القيمة الدفترية</div><div class="val">${money(totalCost-totalDep)}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>الأصول الثابتة (${list.length})</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${activeAssets.length>0?`<button class="btn btn-outline" onclick="openDepreciationRunModal()">${icon('journal')} ترحيل إهلاك شهري</button>`:''}
+          <button class="btn btn-primary" onclick="openFixedAssetModal()">${icon('plus')} أصل جديد</button>
+        </div>
+      </div>
+      ${list.length===0?emptyState('لا توجد أصول ثابتة مسجلة بعد','سجّل أول أصل ثابت زي جهاز أو أثاث أو معدة تصنيع', false):`
+      <div class="table-wrap"><table>
+        <thead><tr><th>الرقم</th><th>الاسم</th><th>الفئة</th><th>تاريخ الشراء</th><th>التكلفة</th><th>مجمع الإهلاك</th><th>القيمة الدفترية</th><th>الحالة</th><th></th></tr></thead>
+        <tbody>${list.map(a=>{
+          const bookValue = assetBookValue(a);
+          const statusBadge = a.status==='pending' ? '<span class="badge partial">بانتظار الموافقة</span>' : a.status==='rejected' ? '<span class="badge unpaid">مرفوض</span>' : a.status==='disposed' ? '<span class="badge neutral">مستبعد</span>' : '<span class="badge paid">نشط</span>';
+          return `<tr>
+            <td>${a.number}</td><td>${esc(a.name)}</td><td>${a.category?esc(a.category):'-'}</td><td>${fmtDate(a.purchaseDate)}</td>
+            <td class="tnum">${money(a.cost)}</td><td class="tnum">${money(a.accumulatedDepreciation||0)}</td><td class="tnum" style="font-weight:700;">${money(bookValue)}</td>
+            <td>${statusBadge}</td>
+            <td>
+              ${a.status==='pending'?`
+                <button class="btn btn-outline btn-icon btn-sm" onclick="openFixedAssetModal('${a.id}')" title="تعديل">${icon('edit')}</button>
+                ${can('approve_expenses')?`<button class="btn btn-primary btn-sm" onclick="approveFixedAsset('${a.id}')">${icon('plus')} اعتماد</button><button class="btn btn-danger-o btn-sm" onclick="rejectFixedAsset('${a.id}')">رفض</button>`:''}
+              `:''}
+              ${a.status==='approved'?`<button class="btn btn-outline btn-sm" onclick="openAssetDisposalModal('${a.id}')">${icon('undo')} استبعاد/بيع</button>`:''}
+              ${can('delete_records')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteFixedAsset('${a.id}')" title="حذف">${icon('trash')}</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`}
+    </div>
+  `;
+}
+function openFixedAssetModal(editId){
+  if(!requirePerm('manage_accounts','إضافة/تعديل أصل ثابت')) return;
+  const a = editId ? DB.fixedAssets.find(x=>x.id===editId) : null;
+  const body = `
+    <div class="row2">
+      <div class="field"><label>اسم الأصل *</label><input id="f_name" value="${a?esc(a.name):''}" placeholder="مثال: ماكينة تعبئة"></div>
+      <div class="field"><label>الفئة (اختياري)</label><input id="f_category" value="${a?esc(a.category||''):''}" placeholder="مثال: معدات تصنيع"></div>
+    </div>
+    <div class="row2" style="margin-top:10px;">
+      <div class="field"><label>تاريخ الشراء</label><input id="f_date" type="date" value="${a?a.purchaseDate:todayISO()}"></div>
+      <div class="field"><label>تكلفة الشراء *</label><input id="f_cost" type="number" min="0" step="0.01" value="${a?a.cost:0}"></div>
+    </div>
+    <div class="row2" style="margin-top:10px;">
+      <div class="field"><label>العمر الإنتاجي (بالسنوات) *</label><input id="f_life" type="number" min="1" step="1" value="${a?a.usefulLifeYears:5}"></div>
+      <div class="field"><label>القيمة المتبقية المتوقعة (اختياري)</label><input id="f_salvage" type="number" min="0" step="0.01" value="${a&&a.salvageValue?a.salvageValue:0}"></div>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>الخزينة / الحساب البنكي المدفوع منه</label><select id="f_cashacc">${cashBankOptionsHtml(a?a.cashAccountId:null)}</select></div>
+    <div class="field" style="margin-top:10px;"><label>ملاحظات</label><input id="f_notes" value="${a?esc(a.notes||''):''}"></div>
+  `;
+  openModal(a?'تعديل أصل ثابت':'أصل ثابت جديد', body, ()=>{
+    const name = document.getElementById('f_name').value.trim();
+    if(!name){ toast('أدخل اسم الأصل'); return false; }
+    const cost = parseFloat(document.getElementById('f_cost').value)||0;
+    if(cost<=0){ toast('أدخل تكلفة صحيحة'); return false; }
+    const usefulLifeYears = parseFloat(document.getElementById('f_life').value)||0;
+    if(usefulLifeYears<=0){ toast('أدخل عمر إنتاجي صحيح بالسنوات'); return false; }
+    const salvageValue = parseFloat(document.getElementById('f_salvage').value)||0;
+    if(salvageValue>=cost){ toast('القيمة المتبقية لازم تكون أقل من التكلفة'); return false; }
+    const purchaseDate = document.getElementById('f_date').value || todayISO();
+    const category = document.getElementById('f_category').value.trim();
+    const cashAccountId = document.getElementById('f_cashacc').value;
+    const notes = document.getElementById('f_notes').value.trim();
+    if(!checkPeriodLock(purchaseDate)) return false;
+    if(a){
+      Object.assign(a, {name, category, purchaseDate, cost, usefulLifeYears, salvageValue, cashAccountId, notes});
+      logActivity('settings', 'تعديل أصل ثابت '+a.number);
+    }else{
+      const asset = { id:uid(), number:nextNumber(DB.fixedAssets,'FA'), name, category, purchaseDate, cost, usefulLifeYears, salvageValue, cashAccountId, notes, accumulatedDepreciation:0, depreciationLog:[], status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
+      DB.fixedAssets.push(asset);
+      logActivity('settings', 'تسجيل أصل ثابت جديد '+asset.number+' - '+name+' (بانتظار الموافقة)');
+    }
+    persist('fixedAssets');
+    closeModal(); render(); toast('تم الحفظ بانتظار الموافقة');
+  });
+}
+function approveFixedAsset(id){
+  if(!requirePerm('approve_expenses','اعتماد الأصول الثابتة')) return;
+  const a = DB.fixedAssets.find(x=>x.id===id);
+  if(!a || a.status!=='pending') return;
+  if(!checkPeriodLock(a.purchaseDate)) return;
+  confirmAction('اعتماد الأصل الثابت', 'سيتم ترحيل قيد الشراء فوراً. هل أنت متأكد؟', ()=>{
+    a.status = 'approved'; a.approvedBy = currentUserName(); a.approvedAt = Date.now();
+    persist('fixedAssets');
+    postJournal(a.purchaseDate, 'شراء أصل ثابت '+a.number+' - '+a.name, [
+      {accountId:'acc_fixed_assets', debit:a.cost, credit:0},
+      {accountId:a.cashAccountId, debit:0, credit:a.cost},
+    ], 'fixed_asset', a.id);
+    logActivity('settings', 'اعتماد أصل ثابت '+a.number+' بقيمة '+money(a.cost));
+    closeModal(); render(); toast('تم الاعتماد بنجاح');
+  });
+}
+function rejectFixedAsset(id){
+  if(!requirePerm('approve_expenses','رفض الأصول الثابتة')) return;
+  const a = DB.fixedAssets.find(x=>x.id===id);
+  if(!a || a.status!=='pending') return;
+  confirmAction('رفض الأصل الثابت', 'هل تريد رفض هذا الأصل؟', ()=>{
+    a.status = 'rejected'; a.rejectedBy = currentUserName(); a.rejectedAt = Date.now();
+    persist('fixedAssets');
+    logActivity('settings', 'رفض أصل ثابت '+a.number);
+    closeModal(); render(); toast('تم الرفض');
+  });
+}
+function deleteFixedAsset(id){
+  if(!requirePerm('delete_records','حذف الأصول الثابتة')) return;
+  const a = DB.fixedAssets.find(x=>x.id===id);
+  if(!a) return;
+  const isPosted = a.status==='approved' || a.status==='disposed';
+  if(isPosted && !checkPeriodLock(a.purchaseDate)) return;
+  const msg = isPosted ? 'الأصل ده معتمد ومترحّل بالفعل (شامل أي إهلاك أو استبعاد اتسجل عليه) - هيتم عكس كل القيود المرتبطة بيه. هل أنت متأكد؟' : 'هل تريد حذف هذا الأصل؟';
+  confirmAction('حذف الأصل الثابت', msg, ()=>{
+    if(isPosted){
+      removeJournalBySource(a.id);
+    }
+    DB.fixedAssets = DB.fixedAssets.filter(x=>x.id!==id);
+    persist('fixedAssets');
+    logActivity('settings', 'حذف أصل ثابت '+a.number);
+    closeModal(); render(); toast('تم الحذف');
+  });
+}
+function openDepreciationRunModal(){
+  if(!requirePerm('approve_expenses','ترحيل إهلاك الأصول')) return;
+  const activeAssets = DB.fixedAssets.filter(a=>a.status==='approved');
+  if(activeAssets.length===0){ toast('لا توجد أصول ثابتة نشطة للإهلاك'); return; }
+  window._depAssets = activeAssets;
+  const defaultPeriod = todayISO().slice(0,7);
+  const body = `
+    <div class="field"><label>شهر الإهلاك</label><input id="f_period" type="month" value="${defaultPeriod}" onchange="updateDepreciationPreview()"></div>
+    <div id="depreciationPreview" style="margin-top:10px;"></div>
+  `;
+  openModal('ترحيل إهلاك شهري', body, ()=>{
+    const period = document.getElementById('f_period').value;
+    if(!period){ toast('اختر الشهر'); return false; }
+    const toRun = window._depAssets.filter(a=>!(a.depreciationLog||[]).some(l=>l.period===period) && assetMonthlyDepreciation(a)>0.009);
+    if(toRun.length===0){ toast('كل الأصول اترحّل عليها إهلاك الشهر ده بالفعل'); return false; }
+    const periodDate = period+'-01';
+    if(!checkPeriodLock(periodDate)) return false;
+    let total = 0;
+    toRun.forEach(a=>{
+      const amt = assetMonthlyDepreciation(a);
+      total += amt;
+      a.accumulatedDepreciation = (a.accumulatedDepreciation||0) + amt;
+      if(!a.depreciationLog) a.depreciationLog = [];
+      a.depreciationLog.push({period, amount:amt, postedAt:Date.now()});
+    });
+    persist('fixedAssets');
+    postJournal(periodDate, 'إهلاك شهري '+period+' لـ'+toRun.length+' أصل', [
+      {accountId:'acc_depreciation_expense', debit:total, credit:0},
+      {accountId:'acc_accum_depreciation', debit:0, credit:total},
+    ], 'depreciation', 'depreciation_'+period);
+    logActivity('settings', 'ترحيل إهلاك شهري '+period+' بقيمة '+money(total)+' لـ'+toRun.length+' أصل');
+    closeModal(); render(); toast('تم ترحيل الإهلاك بنجاح');
+  });
+  setTimeout(updateDepreciationPreview, 0);
+}
+function updateDepreciationPreview(){
+  const periodEl = document.getElementById('f_period');
+  const el = document.getElementById('depreciationPreview');
+  if(!el || !periodEl || !window._depAssets) return;
+  const period = periodEl.value;
+  const rows = window._depAssets.map(a=>{
+    const monthly = assetMonthlyDepreciation(a);
+    const alreadyDone = (a.depreciationLog||[]).some(l=>l.period===period);
+    return {a, monthly, alreadyDone};
+  });
+  const total = rows.filter(r=>!r.alreadyDone).reduce((s,r)=>s+r.monthly,0);
+  el.innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr><th>الأصل</th><th>إهلاك الشهر</th><th></th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td>${esc(r.a.name)}</td><td class="tnum">${money(r.monthly)}</td><td>${r.alreadyDone?'<span class="badge paid">اترحّل بالفعل</span>':''}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="tot-line grand" style="margin-top:10px;"><span>إجمالي الإهلاك المطلوب ترحيله</span><span class="tnum">${money(total)}</span></div>
+  `;
+}
+function openAssetDisposalModal(id){
+  if(!requirePerm('manage_accounts','استبعاد/بيع أصل ثابت')) return;
+  const a = DB.fixedAssets.find(x=>x.id===id);
+  if(!a || a.status!=='approved') return;
+  const bookValue = assetBookValue(a);
+  const body = `
+    <p style="font-size:12.5px;color:var(--text-muted);margin-top:0;">القيمة الدفترية الحالية لـ"${esc(a.name)}": <b>${money(bookValue)}</b></p>
+    <div class="row2">
+      <div class="field"><label>تاريخ الاستبعاد/البيع</label><input id="f_date" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>قيمة البيع (0 لو استبعاد بدون بيع)</label><input id="f_proceeds" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>الخزينة / الحساب البنكي المستلم فيه (لو فيه بيع)</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
+  `;
+  openModal('استبعاد / بيع أصل ثابت', body, ()=>{
+    const date = document.getElementById('f_date').value || todayISO();
+    const proceeds = parseFloat(document.getElementById('f_proceeds').value)||0;
+    const cashAccountId = document.getElementById('f_cashacc').value;
+    if(proceeds>0 && !cashAccountId){ toast('اختر الخزينة المستلم فيها قيمة البيع'); return false; }
+    if(!checkPeriodLock(date)) return false;
+    const accDep = a.accumulatedDepreciation||0;
+    const gainLoss = proceeds - bookValue;
+    const lines = [{accountId:'acc_accum_depreciation', debit:accDep, credit:0}];
+    if(proceeds>0) lines.push({accountId:cashAccountId, debit:proceeds, credit:0});
+    lines.push({accountId:'acc_fixed_assets', debit:0, credit:a.cost});
+    if(gainLoss>0.009) lines.push({accountId:'acc_disposal_gain_loss', debit:0, credit:gainLoss});
+    else if(gainLoss<-0.009) lines.push({accountId:'acc_disposal_gain_loss', debit:-gainLoss, credit:0});
+    postJournal(date, 'استبعاد/بيع أصل ثابت '+a.number+' - '+a.name, lines, 'fixed_asset_disposal', a.id);
+    a.status = 'disposed'; a.disposedDate = date; a.disposedProceeds = proceeds; a.disposedGainLoss = gainLoss; a.disposedBy = currentUserName(); a.disposedAt = Date.now();
+    persist('fixedAssets');
+    logActivity('settings', 'استبعاد أصل ثابت '+a.number+(proceeds>0?' ببيعه بـ'+money(proceeds):'')+(Math.abs(gainLoss)>0.009?' ('+(gainLoss>0?'ربح ':'خسارة ')+money(Math.abs(gainLoss))+')':''));
+    closeModal(); render(); toast('تم الاستبعاد بنجاح');
+  });
+}
 function renderLandedCostsPage(){
   const list = DB.landedCosts.filter(l=>(l.number+l.notes).toLowerCase().includes(landedCostFilter.toLowerCase()));
   const pendingCount = DB.landedCosts.filter(l=>l.status==='pending').length;
@@ -3052,6 +3287,8 @@ function duplicatePurchaseInvoice(id){
   if(!inv) return;
   window._purchPrefillItems = inv.items.map(it=>({...it}));
   window._purchPrefillPartyId = inv.partyId;
+  window._purchPrefillCurrency = inv.currency||DB.settings.currency;
+  window._purchPrefillExchangeRate = inv.exchangeRate||1;
   toast('عدّل بيانات النسخة واضغط حفظ');
   openPurchaseModal();
 }
@@ -3165,12 +3402,14 @@ function loadProductGroupIntoSale(groupId, selectEl){
   setTimeout(()=>{
     const rows = document.querySelectorAll('#itemRows .item-row:not(.head-row)');
     const newRows = Array.from(rows).slice(rows.length-group.items.length);
+    const partyEl = document.getElementById('f_party');
+    const partyId = partyEl ? partyEl.value : null;
     group.items.forEach((it,i)=>{
       const row = newRows[i]; if(!row) return;
       const prod = productById(it.productId);
       row.querySelector('.sel-product').value = it.productId;
       row.querySelector('.inp-qty').value = it.qty;
-      if(prod && row.querySelector('.inp-price')) row.querySelector('.inp-price').value = prod.salePrice;
+      if(prod && row.querySelector('.inp-price')) row.querySelector('.inp-price').value = getEffectivePrice(it.productId, partyId||null);
     });
     updateSaleTotals();
   }, 0);
@@ -4017,11 +4256,18 @@ function openSaleModal(editId){
 }
 function onSalePartyChange(selectedBranchId){
   const partyId = document.getElementById('f_party').value;
-  document.querySelectorAll('#itemRows .sel-product').forEach(sel=>{
+  document.querySelectorAll('#itemRows .item-row:not(.head-row)').forEach(row=>{
+    const sel = row.querySelector('.sel-product');
+    if(!sel) return;
     Array.from(sel.options).forEach(opt=>{
       if(opt.value) opt.dataset.price = getEffectivePrice(opt.value, partyId||null);
     });
+    if(sel.value){
+      const priceInput = row.querySelector('.inp-price');
+      if(priceInput) priceInput.value = getEffectivePrice(sel.value, partyId||null);
+    }
   });
+  updateSaleTotals();
   const box = document.getElementById('advanceBox');
   const branchSel = document.getElementById('f_branch');
   if(branchSel){
@@ -4074,7 +4320,7 @@ function renderPurchaseOrdersPage(){
         <tbody>${list.map(o=>`
           <tr>
             <td>${o.number}</td><td>${esc(o.partyName)}</td><td>${fmtDate(o.date)}</td><td>${o.expectedDate?fmtDate(o.expectedDate):'-'}</td><td>${o.items.length}</td>
-            <td class="tnum">${money(o.total)}</td>
+            <td class="tnum">${money(o.total)}${o.currency&&o.currency!==DB.settings.currency?`<br><span style="font-size:10.5px;color:var(--text-muted);">(${fmt(o.originalTotal)} ${esc(o.currency)})</span>`:''}</td>
             <td>${o.status==='converted'?'<span class="badge paid">تم التحويل لفاتورة</span>':'<span class="badge partial">قيد الانتظار</span>'}</td>
             <td>
               <button class="btn btn-outline btn-icon btn-sm" onclick="printPurchaseOrder('${o.id}')" title="طباعة">${icon('printer')}</button>
@@ -4142,6 +4388,13 @@ function openPurchaseOrderModal(editId){
       <div class="field"><label>تاريخ التسليم المتوقع</label><input id="f_expected" type="date"></div>
     </div>
     <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${o?o.date:todayISO()}"></div>
+    <div class="row2">
+      <div class="field"><label>العملة</label><select id="f_currency" onchange="onPurchaseCurrencyChange()">
+        <option value="${DB.settings.currency}" ${(!o||o.currency===DB.settings.currency||!o.currency)?'selected':''}>${esc(DB.settings.currency)} (الأساسية)</option>
+        ${(DB.settings.currencies||[]).map(c=>`<option value="${c.code}" ${o&&o.currency===c.code?'selected':''}>${esc(c.code)} - ${esc(c.name)}</option>`).join('')}
+      </select></div>
+      <div class="field"><label>سعر الصرف (1 وحدة = كام ${esc(DB.settings.currency)})</label><input id="f_exrate" type="number" step="0.0001" min="0.0001" value="${o&&o.exchangeRate?o.exchangeRate:1}" ${(!o||!o.currency||o.currency===DB.settings.currency)?'disabled':''} oninput="updateSaleTotals()"></div>
+    </div>
     <label>الأصناف</label>
     <div class="item-rows" id="itemRows">
       <div class="item-row head-row"><div>المنتج</div><div>الكمية</div><div>السعر</div><div>الإجمالي</div><div></div></div>
@@ -4170,12 +4423,15 @@ function openPurchaseOrderModal(editId){
       items.push({productId:prod.id, name:prod.name, code:prod.code||'', qty, price, total:qty*price});
     });
     if(items.length===0){ toast('أضف صنف واحد على الأقل'); return false; }
-    const total = items.reduce((s,i)=>s+i.total,0);
+    const currency = document.getElementById('f_currency') ? document.getElementById('f_currency').value : DB.settings.currency;
+    const exchangeRate = document.getElementById('f_exrate') ? (parseFloat(document.getElementById('f_exrate').value)||1) : 1;
+    const totalOrig = items.reduce((s,i)=>s+i.total,0);
+    const total = totalOrig*exchangeRate;
     if(o){
-      Object.assign(o, {partyId, partyName:supplier.name, date, expectedDate, items, total, notes});
+      Object.assign(o, {partyId, partyName:supplier.name, date, expectedDate, items, total, notes, currency, exchangeRate, originalTotal:totalOrig});
       logActivity('po', 'تعديل أمر شراء '+o.number);
     }else{
-      const po = { id:uid(), number:nextNumber(DB.purchaseOrders,'PO'), partyId, partyName:supplier.name, date, expectedDate, items, total, notes, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
+      const po = { id:uid(), number:nextNumber(DB.purchaseOrders,'PO'), partyId, partyName:supplier.name, date, expectedDate, items, total, notes, currency, exchangeRate, originalTotal:totalOrig, status:'pending', createdAt:Date.now(), createdBy:currentUserName() };
       DB.purchaseOrders.push(po);
       logActivity('po', 'إنشاء أمر شراء '+po.number+' - '+supplier.name);
     }
@@ -4205,6 +4461,8 @@ function convertPOToPurchase(id){
   if(!o) return;
   window._purchPrefillItems = o.items.map(it=>({productId:it.productId, name:it.name, code:it.code, qty:it.qty, price:it.price}));
   window._purchPrefillPartyId = o.partyId;
+  window._purchPrefillCurrency = o.currency||DB.settings.currency;
+  window._purchPrefillExchangeRate = o.exchangeRate||1;
   window._poPrefillSourceId = o.id;
   toast('راجع الفاتورة واحفظها لإتمام العملية');
   openPurchaseModal();
@@ -4223,7 +4481,11 @@ function printPurchaseOrder(id){
   const o = DB.purchaseOrders.find(x=>x.id===id);
   if(!o) return;
   const companyName = DB.settings.companyName||'Z International Beauty';
-  const rowsHtml = o.items.map(it=>`<tr><td>${it.code?esc(it.code):'-'}</td><td class="doc-desc">${esc(it.name)}</td><td class="num">${fmt(it.qty)}</td><td class="num">${fmt(it.price)}</td><td class="num" style="font-weight:600;">${money(it.total)}</td></tr>`).join('');
+  const isForeignCur = o.currency && o.currency!==DB.settings.currency;
+  const curLabel = isForeignCur ? o.currency : DB.settings.currency;
+  const itemMoney = (n)=> fmt(n)+' '+curLabel;
+  const rowsHtml = o.items.map(it=>`<tr><td>${it.code?esc(it.code):'-'}</td><td class="doc-desc">${esc(it.name)}</td><td class="num">${fmt(it.qty)}</td><td class="num">${fmt(it.price)}</td><td class="num" style="font-weight:600;">${itemMoney(it.total)}</td></tr>`).join('');
+  const displayTotal = isForeignCur ? (o.originalTotal!=null?o.originalTotal:o.total/(o.exchangeRate||1)) : o.total;
   document.getElementById('printArea').innerHTML = `
     <div class="inv-print">
       <div class="doc-top">
@@ -4240,12 +4502,13 @@ function printPurchaseOrder(id){
       <div class="doc-meta-row">
         <div><div class="doc-meta-lbl">${dl('التاريخ','Date')}</div><div class="doc-meta-val">${fmtDate(o.date)}</div></div>
         <div><div class="doc-meta-lbl">${dl('التسليم المتوقع','Expected Delivery')}</div><div class="doc-meta-val">${o.expectedDate?fmtDate(o.expectedDate):'-'}</div></div>
+        ${isForeignCur?`<div><div class="doc-meta-lbl">${dl('العملة','Currency')}</div><div class="doc-meta-val">${esc(o.currency)} (${dl('سعر الصرف','Rate')} ${o.exchangeRate})</div></div>`:''}
       </div>
       <table class="doc-table cells-left">
         <thead><tr><th>${dl('الكود','Code')}</th><th>${dl('الصنف','Item')}</th><th class="num">${dl('الكمية','Qty')}</th><th class="num">${dl('السعر','Price')}</th><th class="num">${dl('الإجمالي','Amount')}</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
-      <div class="doc-totals-wrap"><div class="tot-line grand"><span>${dl('الإجمالي','Total')}</span><span class="tnum">${money(o.total)}</span></div></div>
+      <div class="doc-totals-wrap"><div class="tot-line grand"><span>${dl('الإجمالي','Total')}</span><span class="tnum">${itemMoney(displayTotal)}</span></div>${isForeignCur?`<div style="font-size:11px;color:#777;text-align:left;margin-top:2px;">${dl('يعادل تقريباً','Approx. equivalent')}: ${money(o.total)}</div>`:''}</div>
       ${o.notes?`<div class="doc-notes">${esc(o.notes)}</div>`:''}
       <div class="doc-footer"><div class="doc-footer-page">Page 1 of 1</div></div>
     </div>
@@ -4444,6 +4707,16 @@ function openPurchaseModal(editId){
       });
       const partyEl = document.getElementById('f_party');
       if(partyEl && prefillParty) partyEl.value = prefillParty;
+      const currEl = document.getElementById('f_currency');
+      const exRateEl = document.getElementById('f_exrate');
+      if(currEl && window._purchPrefillCurrency){
+        currEl.value = window._purchPrefillCurrency;
+        if(exRateEl){
+          exRateEl.value = window._purchPrefillExchangeRate||1;
+          exRateEl.disabled = window._purchPrefillCurrency===DB.settings.currency;
+        }
+      }
+      window._purchPrefillCurrency = null; window._purchPrefillExchangeRate = null;
       updateSaleTotals();
     }, 0);
     window._purchPrefillItems = null; window._purchPrefillPartyId = null;
@@ -5733,6 +6006,7 @@ function renderTesterHandouts(){
               <button class="btn btn-outline btn-icon btn-sm" onclick="editTesterHandout('${t.id}')" title="تعديل">${icon('edit')}</button>
               ${can('approve_consignment')?`<button class="btn btn-primary btn-sm" onclick="approveTesterHandout('${t.id}')">${icon('plus')} اعتماد</button><button class="btn btn-danger-o btn-sm" onclick="rejectTesterHandout('${t.id}')">رفض</button>`:''}
             `:''}
+            ${status==='approved'?`<button class="btn btn-outline btn-icon btn-sm" onclick="openTesterReturnModal('${t.id}')" title="مرتجع">${icon('undo')}</button>`:''}
             ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteTesterHandout('${t.id}')" title="حذف">${icon('trash')}</button>`:''}
           </td>
         </tr>`;
@@ -5878,6 +6152,65 @@ function deleteTesterHandout(id){
     persist('testerHandouts');
     logActivity('samples', 'حذف توزيع عينات/تسترز '+th.number);
     closeModal(); render(); toast('تم الحذف بنجاح');
+  });
+}
+function returnedQtyForTesterItem(handoutId, productId){
+  return DB.returns.filter(r=>r.originalInvoiceId===handoutId && r.type==='tester_return').reduce((s,r)=>{
+    const it = r.items.find(x=>x.productId===productId);
+    return s + (it?it.qty:0);
+  },0);
+}
+function openTesterReturnModal(handoutId){
+  const th = DB.testerHandouts.find(x=>x.id===handoutId);
+  if(!th) return;
+  if((th.status||'approved')!=='approved'){ toast('التوزيع ده لسه مش معتمد - لازم يتعتمد الأول قبل عمل مرتجع عليه'); return; }
+  const rows = th.items.map(it=>{
+    const already = returnedQtyForTesterItem(handoutId, it.productId);
+    const maxRet = Math.max(0, it.qty - already);
+    return {...it, already, maxRet};
+  });
+  if(rows.every(r=>r.maxRet<=0)){ toast('تم استرجاع كل الأصناف في هذا التوزيع بالفعل'); return; }
+  const body = `
+    <p style="font-size:12.5px;color:var(--text-muted);margin-top:0;">توزيع ${th.number}${th.customerName?' - '+esc(th.customerName):''}</p>
+    <div class="item-rows" id="testerRetRows">
+      <div class="item-row head-row" style="grid-template-columns:2fr 1fr 1fr 1fr;"><div>المنتج</div><div>الكمية الأصلية</div><div>المتاح للإرجاع</div><div>كمية الإرجاع</div></div>
+      ${rows.map((r,i)=>`
+        <div class="item-row" style="grid-template-columns:2fr 1fr 1fr 1fr;">
+          <div>${esc(r.name)}</div>
+          <div class="tnum">${fmt(r.qty)}</div>
+          <div class="tnum">${fmt(r.maxRet)}</div>
+          <div><input type="number" min="0" max="${r.maxRet}" step="1" value="0" class="tester-ret-qty" data-idx="${i}" ${r.maxRet<=0?'disabled':''}></div>
+        </div>`).join('')}
+    </div>
+  `;
+  window._testerRetRows = rows;
+  openModal('مرتجع عينات/تسترز', body, ()=>{
+    const items = [];
+    document.querySelectorAll('.tester-ret-qty').forEach(inp=>{
+      const idx = parseInt(inp.dataset.idx);
+      const qty = parseFloat(inp.value)||0;
+      const r = window._testerRetRows[idx];
+      if(qty>0){
+        if(qty>r.maxRet){ toast('كمية الإرجاع أكبر من المتاح لـ '+r.name); return; }
+        items.push({productId:r.productId, name:r.name, qty, cost:r.cost, total:qty*(r.cost||0)});
+      }
+    });
+    if(items.length===0){ toast('أدخل كمية إرجاع لصنف واحد على الأقل'); return false; }
+    if(!checkPeriodLock(todayISO())) return false;
+    const value = items.reduce((s,i)=>s+i.total,0);
+    const ret = { id:uid(), number:nextNumber(DB.returns,'SMPRET'), type:'tester_return', originalInvoiceId:th.id, originalNumber:th.number, date:todayISO(), partyId:th.customerId||null, partyName:th.customerName||'', items, subtotal:value, taxAmount:0, total:value, createdAt:Date.now(), createdBy:currentUserName() };
+    DB.returns.push(ret);
+    items.forEach(it=>{ const p = productById(it.productId); if(p) adjustStock(p, it.qty); });
+    items.forEach(it=>{ logStockMove(it.productId, it.qty, 'samples_return', ret.number, 'مرتجع عينات/تسترز على توزيع '+th.number); });
+    persist('returns'); persist('products');
+    if(value>0){
+      postJournal(ret.date, 'مرتجع عينات وتسترز '+ret.number+' - توزيع '+th.number, [
+        {accountId:'acc_inventory', debit:value, credit:0},
+        {accountId:'acc_samples', debit:0, credit:value},
+      ], 'tester_return', ret.id);
+    }
+    logActivity('samples', 'مرتجع عينات/تسترز '+ret.number+' على توزيع '+th.number+' بقيمة '+money(value));
+    closeModal(); render(); toast('تم تسجيل المرتجع بنجاح');
   });
 }
 function addTesterItemRow(){
@@ -6230,6 +6563,7 @@ function renderReports(){
   else if(reportTab==='customerledger') body = reportPartyLedger('customers');
   else if(reportTab==='supplierledger') body = reportPartyLedger('suppliers');
   else if(reportTab==='income') body = reportIncomeStatement();
+  else if(reportTab==='cashflow') body = reportCashFlow();
   else if(reportTab==='balancesheet') body = reportBalanceSheet();
 
   return `
@@ -6857,6 +7191,80 @@ function reportIncomeStatement(){
       <div class="stat-card ${netMargin>=0?'green':'red'}"><div class="lbl">هامش صافي الربح (Net Margin)</div><div class="val">${netMargin.toFixed(1)}%</div></div>
     </div>
     <p style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">هامش الربح الإجمالي = (الإيرادات - تكلفة البضاعة المباعة) ÷ الإيرادات. هامش صافي الربح = صافي الربح ÷ الإيرادات (بعد خصم كل المصروفات).</p>
+  `;
+}
+function reportCashFlow(){
+  const cashAccIds = cashBankAccounts().map(a=>a.id);
+  if(cashAccIds.length===0) return `<p style="color:var(--text-muted);">لا توجد خزائن أو حسابات بنكية معرّفة بعد.</p>`;
+
+  const categoryLabels = {operating:'الأنشطة التشغيلية', investing:'الأنشطة الاستثمارية', financing:'الأنشطة التمويلية'};
+  const sourceLabels = {
+    sale_invoice:'تحصيلات وتعاملات مع العملاء', purchase_invoice:'مدفوعات للموردين', expense:'مصروفات تشغيلية',
+    custody:'حركات العهد', consign_report:'تحصيل تقارير بيع بالأمانة', consign_shipment:'حركات بضاعة أمانة',
+    production:'تكلفة تشغيل/عمالة تصنيع', landedcost:'شحن وتكاليف إضافية',
+    tester_handout:'عينات وتسترز', tester_return:'مرتجع عينات وتسترز', purchase_receive:'استلام مشتريات',
+    fixed_asset:'شراء أصول ثابتة', fixed_asset_disposal:'بيع/استبعاد أصول ثابتة',
+    manual_capital:'إيداعات رأس المال', manual_advance:'دفعات مقدمة من/إلى العملاء والموردين', manual:'حركات يدوية أخرى',
+  };
+  const categories = {operating:{}, investing:{}, financing:{}};
+
+  let openingBalance = 0;
+  if(repFrom){
+    DB.journal.forEach(j=>{
+      if(j.date>=repFrom) return;
+      j.lines.forEach(l=>{ if(cashAccIds.includes(l.accountId)) openingBalance += (l.debit||0)-(l.credit||0); });
+    });
+  }
+
+  DB.journal.forEach(j=>{
+    if(!inRange(j.date)) return;
+    j.lines.forEach(l=>{
+      if(!cashAccIds.includes(l.accountId)) return;
+      const otherLines = j.lines.filter(x=>x!==l);
+      const isTransfer = otherLines.length>0 && otherLines.every(x=>cashAccIds.includes(x.accountId));
+      if(isTransfer) return;
+      let cat = 'operating';
+      let labelKey = j.sourceType;
+      if(j.sourceType==='fixed_asset' || j.sourceType==='fixed_asset_disposal'){ cat='investing'; }
+      else if(j.sourceType==='manual'){
+        if(otherLines.some(x=>x.accountId==='acc_capital')){ cat='financing'; labelKey='manual_capital'; }
+        else if(otherLines.some(x=>x.accountId==='acc_cust_adv'||x.accountId==='acc_supp_adv')){ labelKey='manual_advance'; }
+        else { labelKey='manual'; }
+      }
+      const net = (l.debit||0)-(l.credit||0);
+      const label = sourceLabels[labelKey] || sourceLabels['manual'];
+      categories[cat][label] = (categories[cat][label]||0) + net;
+    });
+  });
+
+  const sectionHtml = (catKey) => {
+    const rows = Object.entries(categories[catKey]);
+    const subtotal = rows.reduce((s,[,v])=>s+v,0);
+    return `
+      <h3 style="font-size:14.5px;color:var(--primary-dark);margin-top:18px;">${categoryLabels[catKey]}</h3>
+      <div class="table-wrap"><table><tbody>
+        ${rows.length===0?'<tr><td style="color:var(--text-muted);">لا توجد حركات</td><td></td></tr>':rows.map(([label,val])=>`<tr><td>${esc(label)}</td><td class="tnum" style="${val<0?'color:var(--danger);':''}">${money(val)}</td></tr>`).join('')}
+        <tr><td style="font-weight:700;">صافي التدفق من ${categoryLabels[catKey]}</td><td class="tnum" style="font-weight:700;${subtotal<0?'color:var(--danger);':''}">${money(subtotal)}</td></tr>
+      </tbody></table></div>
+    `;
+  };
+
+  const totalOperating = Object.values(categories.operating).reduce((s,v)=>s+v,0);
+  const totalInvesting = Object.values(categories.investing).reduce((s,v)=>s+v,0);
+  const totalFinancing = Object.values(categories.financing).reduce((s,v)=>s+v,0);
+  const netChange = totalOperating + totalInvesting + totalFinancing;
+  const closingBalance = openingBalance + netChange;
+
+  return `
+    ${sectionHtml('operating')}
+    ${sectionHtml('investing')}
+    ${sectionHtml('financing')}
+    <div class="stat-grid" style="margin-top:18px;">
+      <div class="stat-card"><div class="lbl">رصيد النقدية في بداية الفترة</div><div class="val">${money(openingBalance)}</div></div>
+      <div class="stat-card ${netChange>=0?'green':'red'}"><div class="lbl">صافي التغيّر في النقدية</div><div class="val">${money(netChange)}</div></div>
+      <div class="stat-card gold"><div class="lbl">رصيد النقدية في نهاية الفترة</div><div class="val">${money(closingBalance)}</div></div>
+    </div>
+    <p style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">القائمة دي بتتبع الحركات الفعلية اللي دخلت أو خرجت من الخزائن والحسابات البنكية بس (مش أرباح دفترية زي قائمة الدخل)، وبتستثني التحويلات الداخلية بين الخزائن نفسها عشان متتكررش. لو مفيش فترة محددة فوق، الرصيد الافتتاحي بيبقى صفر وبيعرض كل الحركات من بداية استخدامك للنظام.</p>
   `;
 }
 function reportBalanceSheet(){
@@ -8044,6 +8452,12 @@ function renderHealthCheckPage(){
   const oldGoodsInTransit = goodsInTransit.filter(s=>(s.approvedAt||s.createdAt)<cutoff);
   checks.push({label:'بضاعة معتمدة ولسه مستلمتش بالمخزن من أكتر من أسبوع', ok:oldGoodsInTransit.length===0, detail:oldGoodsInTransit.length+' فاتورة شراء: '+oldGoodsInTransit.slice(0,5).map(s=>s.number).join('، '), severity:'warning', action:oldGoodsInTransit.length>0?()=>goTo('purchasereceiving'):null});
 
+  if(isOnlineConfigured() && !LOCAL_MODE){
+    const dataSizeMB = estimateDataSizeBytes()*(1+CLOUD_BACKUP_SLOTS)/1024/1024;
+    const sizePct = (dataSizeMB/500)*100;
+    checks.push({label:'مساحة قاعدة البيانات (تقديرية)', ok:sizePct<70, detail:dataSizeMB.toFixed(1)+' ميجا تقريباً من أصل 500 ميجا ('+sizePct.toFixed(0)+'%)', severity:sizePct>=90?'danger':'warning', action:()=>goTo('settings')});
+  }
+
   // 5. Negative stock
   const negStock = DB.products.filter(p=>p.quantity<-0.009);
   checks.push({label:'منتجات بكمية سالبة في المخزون', ok:negStock.length===0, detail:negStock.length+' منتج: '+negStock.slice(0,5).map(p=>p.name).join('، '), severity:'danger', action:negStock.length>0?()=>goTo('inventory'):null});
@@ -8296,9 +8710,13 @@ function renderSettings(){
     </div>`:''}
     ${(canSettings && isOnlineConfigured() && !LOCAL_MODE)?`
     <div class="card" style="max-width:520px;">
+      <div class="card-head"><h2>مساحة قاعدة البيانات</h2></div>
+      ${renderDataSizeMonitor()}
+    </div>
+    <div class="card" style="max-width:520px;">
       <div class="card-head"><h2>نسخ احتياطي سحابي تلقائي</h2></div>
       <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px 0;">
-        بيتحفظ تلقائياً جوّه قاعدة بياناتك أونلاين كل يوم تقريباً - <b>مش محتاج أي إذن أو تدخل منك</b>. بيتحفظ آخر 3 نسخ بس وبيتشال الأقدم تلقائياً.
+        بيتحفظ تلقائياً جوّه قاعدة بياناتك أونلاين كل يوم تقريباً - <b>مش محتاج أي إذن أو تدخل منك</b>. بيتحفظ آخر نسختين بس وبيتشال الأقدم تلقائياً (عشان مياخدش مساحة كبيرة).
       </p>
       <div id="cloudBackupList">${renderCloudBackupList()}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
@@ -8356,9 +8774,9 @@ function factoryReset(){
   DB.sales = []; DB.purchases = []; DB.returns = []; DB.quotations = [];
   DB.stockMoves = []; DB.consignShipments = []; DB.consignReports = []; DB.testerHandouts = []; DB.expenses = []; DB.productGroups = []; DB.crmActivities = [];
   DB.purchaseOrders = []; DB.warehouses = [{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = []; DB.custodies = []; DB.custodyEntries = []; DB.boms = []; DB.productionOrders = []; DB.landedCosts = []; DB.comments = [];
-  DB.journal = []; DB.activityLog = []; DB.priceLists = [];
+  DB.journal = []; DB.activityLog = []; DB.priceLists = []; DB.fixedAssets = [];
   DB.accounts = DEFAULT_ACCOUNTS.map(a=>({...a}));
-  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','journal','activityLog','priceLists','accounts'].forEach(k=>persist(k));
+  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','journal','activityLog','priceLists','fixedAssets','accounts'].forEach(k=>persist(k));
   logActivity('factory_reset', 'تمت استعادة النظام لوضعه الافتراضي بالكامل بواسطة '+resetBy);
   closeModal(); usersLoaded=false; render();
   toast('تم استعادة النظام لوضعه الافتراضي بنجاح');
@@ -8404,7 +8822,7 @@ async function pickBackupFolder(){
 function buildBackupObject(){
   return {
     products:DB.products, customers:DB.customers, suppliers:DB.suppliers, sales:DB.sales, purchases:DB.purchases,
-    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, productGroups:DB.productGroups, crmActivities:DB.crmActivities, purchaseOrders:DB.purchaseOrders, warehouses:DB.warehouses, salesReps:DB.salesReps, custodies:DB.custodies, custodyEntries:DB.custodyEntries, boms:DB.boms, productionOrders:DB.productionOrders, landedCosts:DB.landedCosts, comments:DB.comments, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, priceLists:DB.priceLists, settings:DB.settings,
+    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, productGroups:DB.productGroups, crmActivities:DB.crmActivities, purchaseOrders:DB.purchaseOrders, warehouses:DB.warehouses, salesReps:DB.salesReps, custodies:DB.custodies, custodyEntries:DB.custodyEntries, boms:DB.boms, productionOrders:DB.productionOrders, landedCosts:DB.landedCosts, comments:DB.comments, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, priceLists:DB.priceLists, fixedAssets:DB.fixedAssets, settings:DB.settings,
     exportedAt:new Date().toISOString(), version:1
   };
 }
@@ -8460,6 +8878,34 @@ function downloadBackup(){
   logActivity('backup', 'تنزيل نسخة احتياطية');
   toast('تم تنزيل النسخة الاحتياطية');
 }
+function estimateDataSizeBytes(){
+  try{ return new Blob([JSON.stringify(buildBackupObject())]).size; }catch(e){ return 0; }
+}
+function renderDataSizeMonitor(){
+  const liveDataBytes = estimateDataSizeBytes();
+  const estimatedTotalBytes = liveDataBytes * (1 + CLOUD_BACKUP_SLOTS);
+  const limitBytes = 500*1024*1024;
+  const pct = Math.min(100, (estimatedTotalBytes/limitBytes)*100);
+  const fmtMB = b => (b/1024/1024).toFixed(2);
+  let color='var(--success)', bg='var(--success-bg)', severity='ok';
+  if(pct>=70 && pct<90){ color='var(--warning)'; bg='var(--warning-bg)'; severity='warning'; }
+  else if(pct>=90){ color='var(--danger)'; bg='var(--danger-bg)'; severity='danger'; }
+  return `
+    <div style="padding:12px 14px;background:${bg};border-radius:10px;">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:13px;font-weight:700;color:${color};margin-bottom:6px;">
+        <span>${fmtMB(estimatedTotalBytes)} ميجابايت تقريباً</span>
+        <span>من أصل 500 ميجا (النسخة المجانية من Supabase)</span>
+      </div>
+      <div style="background:rgba(0,0,0,.08);border-radius:6px;height:8px;overflow:hidden;">
+        <div style="background:${color};height:100%;width:${pct}%;"></div>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">
+        ${severity==='danger'?'⚠️ قريب جداً من الحد المجاني - فكّر تشترك في خطة Pro (25 دولار شهرياً) قبل ما تقفل قاعدة البيانات.':severity==='warning'?'اقترب شوية من الحد المجاني - يفضل تراقب الموضوع من وقت للتاني.':'لسه بعيد عن الحد المجاني، مفيش داعي للقلق دلوقتي.'}
+        <br>الرقم ده تقديري (بيانات النظام + نسختين احتياطيتين)، ومش بيشمل مساحات تانية بتاخدها Supabase نفسها.
+      </div>
+    </div>
+  `;
+}
 let _cloudBackupMetaCache = null;
 let _cloudBackupMetaLoading = false;
 function renderCloudBackupList(){
@@ -8481,15 +8927,16 @@ function renderCloudBackupList(){
     <tbody>${entries.map(e=>`<tr><td>${new Date(e.timestamp).toLocaleString('ar-EG-u-nu-latn',{dateStyle:'medium',timeStyle:'short'})}</td><td><button class="btn btn-outline btn-sm" onclick="restoreCloudBackup(${e.slot})">${icon('undo')} استعادة</button></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
+const CLOUD_BACKUP_SLOTS = 2;
 async function runCloudAutoBackup(manual){
   if(!isOnlineConfigured() || LOCAL_MODE){ if(manual) toast('النسخ الاحتياطي السحابي متاح بس لما النظام متصل بقاعدة بيانات أونلاين'); return; }
   try{
     const meta = (await loadKey('zib_cloud_backup_meta', {entries:[]})) || {entries:[]};
     let entries = meta.entries||[];
     let slot;
-    if(entries.length<3){
+    if(entries.length<CLOUD_BACKUP_SLOTS){
       const usedSlots = entries.map(e=>e.slot);
-      slot = [0,1,2].find(s=>!usedSlots.includes(s));
+      slot = Array.from({length:CLOUD_BACKUP_SLOTS}, (_,i)=>i).find(s=>!usedSlots.includes(s));
     }else{
       entries.sort((a,b)=>a.timestamp-b.timestamp);
       slot = entries[0].slot;
@@ -8527,9 +8974,9 @@ function applyBackupData(data, sourceLabel){
   DB.testerHandouts = data.testerHandouts||[]; DB.expenses = data.expenses||[]; DB.productGroups = data.productGroups||[]; DB.crmActivities = data.crmActivities||[];
   DB.purchaseOrders = data.purchaseOrders||[]; DB.warehouses = data.warehouses||[{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = data.salesReps||[]; DB.custodies = data.custodies||[]; DB.custodyEntries = data.custodyEntries||[]; DB.boms = data.boms||[]; DB.productionOrders = data.productionOrders||[]; DB.landedCosts = data.landedCosts||[]; DB.comments = data.comments||[];
   DB.accounts = data.accounts||DEFAULT_ACCOUNTS.map(a=>({...a})); DB.journal = data.journal||[];
-  DB.activityLog = data.activityLog||[]; DB.priceLists = data.priceLists||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0};
+  DB.activityLog = data.activityLog||[]; DB.priceLists = data.priceLists||[]; DB.fixedAssets = data.fixedAssets||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0};
   ensureDefaultAccounts();
-  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','accounts','journal','activityLog','priceLists','settings'].forEach(k=>persist(k));
+  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','accounts','journal','activityLog','priceLists','fixedAssets','settings'].forEach(k=>persist(k));
   logActivity('restore', 'استعادة نسخة احتياطية '+(sourceLabel||'من ملف'));
   closeModal(); usersLoaded=false; render(); toast('تم استعادة النسخة الاحتياطية بنجاح');
 }

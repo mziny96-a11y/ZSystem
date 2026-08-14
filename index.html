@@ -1798,6 +1798,16 @@ function closeMobileDrawer(){
   if(overlay) overlay.classList.remove('open');
 }
 
+function renderKeepFocus(inputId){
+  const el = document.getElementById(inputId);
+  const cursorPos = el ? el.selectionStart : null;
+  render();
+  const newEl = document.getElementById(inputId);
+  if(newEl){
+    newEl.focus();
+    if(cursorPos!=null){ try{ newEl.setSelectionRange(cursorPos, cursorPos); }catch(e){} }
+  }
+}
 function render(){
   if(!navItemAllowed(VIEW)){ VIEW = 'dashboard'; }
   renderNav();
@@ -1920,7 +1930,7 @@ function renderInventory(){
         </div>
       </div>
       <div class="search-bar" style="display:flex;gap:10px;">
-        <input style="flex:1;" placeholder="بحث بالاسم أو الكود أو الفئة أو الباركود..." value="${esc(invFilter)}" oninput="invFilter=this.value; render();">
+        <input id="search_invFilter" style="flex:1;" placeholder="بحث بالاسم أو الكود أو الفئة أو الباركود..." value="${esc(invFilter)}" oninput="invFilter=this.value; renderKeepFocus('search_invFilter');">
         <select style="max-width:200px;" onchange="invCatFilter=this.value; render();">
           <option value="">كل الفئات</option>
           ${categories.map(c=>`<option value="${esc(c)}" ${invCatFilter===c?'selected':''}>${esc(c)}</option>`).join('')}
@@ -2122,7 +2132,7 @@ function renderBomsPage(){
         <h2>وصفات التصنيع (${DB.boms.length})</h2>
         <button class="btn btn-primary" onclick="openBomModal()">${icon('plus')} وصفة جديدة</button>
       </div>
-      <div class="search-bar"><input placeholder="بحث باسم الوصفة أو المنتج..." value="${esc(bomFilter)}" oninput="bomFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_bomFilter" placeholder="بحث باسم الوصفة أو المنتج..." value="${esc(bomFilter)}" oninput="bomFilter=this.value; renderKeepFocus('search_bomFilter');"></div>
       ${list.length===0?emptyState('لا توجد وصفات تصنيع بعد','عرّف أول وصفة: منتج جاهز وإيه المواد الخام اللازمة لتصنيعه',false):`
       <div class="table-wrap"><table>
         <thead><tr><th>اسم الوصفة</th><th>المنتج الناتج</th><th>الكمية الناتجة لكل دورة</th><th>عدد المكوّنات</th><th>تكلفة الدورة (تقديري)</th><th></th></tr></thead>
@@ -2253,7 +2263,7 @@ function renderProductionPage(){
         <button class="btn btn-primary" onclick="openProductionOrderModal()" ${DB.boms.length===0?'disabled title="عرّف وصفة تصنيع أولاً"':''}>${icon('plus')} أمر تصنيع جديد</button>
       </div>
       ${DB.boms.length===0?`<p style="font-size:12.5px;color:var(--text-muted);">محتاج تعرّف <a href="#" onclick="goTo('boms');return false;" style="color:var(--primary);">وصفة تصنيع</a> واحدة على الأقل قبل ما تعمل أمر تصنيع.</p>`:''}
-      <div class="search-bar"><input placeholder="بحث باسم الوصفة أو المنتج..." value="${esc(productionFilter)}" oninput="productionFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_productionFilter" placeholder="بحث باسم الوصفة أو المنتج..." value="${esc(productionFilter)}" oninput="productionFilter=this.value; renderKeepFocus('search_productionFilter');"></div>
       ${list.length===0?emptyState('لا توجد أوامر تصنيع بعد','', false):`
       <div class="table-wrap"><table>
         <thead><tr><th>الرقم</th><th>المنتج الناتج</th><th>الكمية</th><th>التاريخ</th><th>التكلفة الإجمالية</th><th>الحالة</th><th></th></tr></thead>
@@ -2801,7 +2811,7 @@ function renderLandedCostsPage(){
         <button class="btn btn-primary" onclick="openLandedCostModal()">${icon('plus')} تكلفة شحن جديدة</button>
       </div>
       <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px 0;">هنا بتسجّل تكلفة الشحن أو النقل أو الجمارك وتوزّعها تلقائياً على تكلفة المنتجات المتأثرة، بدل ما تتسجل كمصروف عام مايأثرش على هامش ربح المنتج.</p>
-      <div class="search-bar"><input placeholder="بحث بالرقم أو الملاحظات..." value="${esc(landedCostFilter)}" oninput="landedCostFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_landedCostFilter" placeholder="بحث بالرقم أو الملاحظات..." value="${esc(landedCostFilter)}" oninput="landedCostFilter=this.value; renderKeepFocus('search_landedCostFilter');"></div>
       ${list.length===0?emptyState('لا توجد تكاليف شحن مسجلة بعد','', false):`
       <div class="table-wrap"><table>
         <thead><tr><th>الرقم</th><th>التاريخ</th><th>عدد المنتجات المتأثرة</th><th>إجمالي المبلغ</th><th>طريقة التوزيع</th><th>الحالة</th><th></th></tr></thead>
@@ -3611,7 +3621,7 @@ function renderParty(kind){
           <button class="btn btn-primary" onclick="openPartyModal('${kind}')">${icon('plus')} ${isCust?'عميل جديد':'مورد جديد'}</button>
         </div>
       </div>
-      <div class="search-bar"><input placeholder="بحث بالاسم أو الهاتف..." value="${esc(partyFilter[kind])}" oninput="partyFilter['${kind}']=this.value; render();"></div>
+      <div class="search-bar"><input id="search_partyFilter" placeholder="بحث بالاسم أو الهاتف..." value="${esc(partyFilter[kind])}" oninput="partyFilter['${kind}']=this.value; renderKeepFocus('search_partyFilter');"></div>
       ${list.length===0 ? emptyState(isCust?'لا يوجد عملاء':'لا يوجد موردين', isCust?'أضف أول عميل لتسجيل عمليات البيع له':'أضف أول مورد لتسجيل المشتريات منه', true, isCust?'customer':'supplier') : `
       <div class="table-wrap"><table>
         <thead><tr><th>الاسم</th><th>الهاتف</th><th>العنوان</th><th>${isCust?'إجمالي المبيعات':'إجمالي المشتريات'}</th><th>${isCust?'مستحق له':'مستحق لهم'}</th>${isCust?'<th>الحد الائتماني</th>':''}<th>رصيد دفعة مقدمة</th><th></th></tr></thead>
@@ -3909,7 +3919,7 @@ function renderPriceListsPage(){
         <button class="btn btn-primary" onclick="openPriceListModal()">${icon('plus')} قائمة أسعار جديدة</button>
       </div>
       <p style="font-size:12.5px;color:var(--text-muted);">اربط أي قائمة سعر بعميل من صفحة "العملاء" - أي منتج مش محدد له سعر خاص في القائمة هياخد السعر العادي تلقائياً.</p>
-      <div class="search-bar"><input placeholder="بحث باسم القائمة..." value="${esc(priceListFilter)}" oninput="priceListFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_priceListFilter" placeholder="بحث باسم القائمة..." value="${esc(priceListFilter)}" oninput="priceListFilter=this.value; renderKeepFocus('search_priceListFilter');"></div>
       ${list.length===0?emptyState('لا توجد قوائم أسعار بعد','أنشئ قائمة زي "جملة" وحدد أسعار مخصصة للمنتجات اللي عايزها', false):`
       <div class="table-wrap"><table>
         <thead><tr><th>الاسم</th><th>عدد المنتجات المخصصة</th><th>عدد العملاء المرتبطين</th><th></th></tr></thead>
@@ -3988,7 +3998,7 @@ function renderSales(){
         <h2>فواتير المبيعات (${DB.sales.length})</h2>
         <button class="btn btn-primary" onclick="openSaleModal()">${icon('plus')} فاتورة بيع جديدة</button>
       </div>
-      <div class="search-bar"><input placeholder="بحث برقم الفاتورة أو اسم العميل أو رقم أمر الشراء..." value="${esc(salesFilter)}" oninput="salesFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_salesFilter" placeholder="بحث برقم الفاتورة أو اسم العميل أو رقم أمر الشراء..." value="${esc(salesFilter)}" oninput="salesFilter=this.value; renderKeepFocus('search_salesFilter');"></div>
       ${list.length===0 ? emptyState('لا توجد فواتير مبيعات','سجّل أول عملية بيع لعميلك',true,'sales') : `
       <div class="table-wrap"><table>
         <thead><tr><th>رقم الفاتورة</th><th>رقم أمر الشراء (PO)</th><th>العميل</th><th>الفرع</th><th>التاريخ</th><th>الاستحقاق</th><th>عدد الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead>
@@ -4313,7 +4323,7 @@ function renderPurchaseOrdersPage(){
         <h2>أوامر الشراء (${DB.purchaseOrders.length})</h2>
         <button class="btn btn-primary" onclick="openPurchaseOrderModal()">${icon('plus')} أمر شراء جديد</button>
       </div>
-      <div class="search-bar"><input placeholder="بحث برقم الأمر أو اسم المورد..." value="${esc(poFilter)}" oninput="poFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_poFilter" placeholder="بحث برقم الأمر أو اسم المورد..." value="${esc(poFilter)}" oninput="poFilter=this.value; renderKeepFocus('search_poFilter');"></div>
       ${list.length===0 ? emptyState('لا توجد أوامر شراء','أنشئ أول أمر شراء لمورد قبل تحويله لفاتورة') : `
       <div class="table-wrap"><table>
         <thead><tr><th>الرقم</th><th>المورد</th><th>التاريخ</th><th>تاريخ التسليم المتوقع</th><th>عدد الأصناف</th><th>الإجمالي</th><th>الحالة</th><th></th></tr></thead>
@@ -4327,8 +4337,8 @@ function renderPurchaseOrdersPage(){
               ${o.status!=='converted'?`
                 <button class="btn btn-outline btn-icon btn-sm" onclick="openPurchaseOrderModal('${o.id}')" title="تعديل">${icon('edit')}</button>
                 <button class="btn btn-primary btn-sm" onclick="convertPOToPurchase('${o.id}')">${icon('plus')} تحويل لفاتورة شراء</button>
-                ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deletePurchaseOrder('${o.id}')">${icon('trash')}</button>`:''}
               `:''}
+              ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deletePurchaseOrder('${o.id}')">${icon('trash')}</button>`:''}
             </td>
           </tr>`).join('')}</tbody>
       </table></div>`}
@@ -5377,7 +5387,7 @@ function renderQuotationsPage(){
         <h2>عروض الأسعار (${(DB.quotations||[]).length})</h2>
         <button class="btn btn-primary" onclick="openQuotationModal()">${icon('plus')} عرض سعر جديد</button>
       </div>
-      <div class="search-bar"><input placeholder="بحث برقم العرض أو اسم العميل..." value="${esc(quoteFilter)}" oninput="quoteFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_quoteFilter" placeholder="بحث برقم العرض أو اسم العميل..." value="${esc(quoteFilter)}" oninput="quoteFilter=this.value; renderKeepFocus('search_quoteFilter');"></div>
       ${list.length===0 ? emptyState('لا توجد عروض أسعار','أنشئ أول عرض سعر لعميلك قبل تحويله لفاتورة بيع') : `
       <div class="table-wrap"><table>
         <thead><tr><th>رقم العرض</th><th>العميل</th><th>التاريخ</th><th>صالح حتى</th><th>الإجمالي</th><th>الحالة</th><th></th></tr></thead>
@@ -6505,7 +6515,7 @@ function renderPurchases(){
         <h2>فواتير المشتريات (${DB.purchases.length})</h2>
         <button class="btn btn-primary" onclick="openPurchaseModal()">${icon('plus')} فاتورة شراء جديدة</button>
       </div>
-      <div class="search-bar"><input placeholder="بحث برقم الفاتورة أو اسم المورد..." value="${esc(purchFilter)}" oninput="purchFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_purchFilter" placeholder="بحث برقم الفاتورة أو اسم المورد..." value="${esc(purchFilter)}" oninput="purchFilter=this.value; renderKeepFocus('search_purchFilter');"></div>
       ${list.length===0 ? emptyState('لا توجد فواتير مشتريات','سجّل أول عملية شراء من المورد',true,'purchases') : `
       <div class="table-wrap"><table>
         <thead><tr><th>رقم الفاتورة</th><th>المورد</th><th>التاريخ</th><th>الاستحقاق</th><th>عدد الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th></th></tr></thead>
@@ -7163,34 +7173,46 @@ function reportPartyLedger(kind){
 }
 function reportIncomeStatement(){
   const revAccs = DB.accounts.filter(a=>a.type==='revenue');
-  const expAccs = DB.accounts.filter(a=>a.type==='expense');
-  const revRows = revAccs.map(a=>({a, val:accountBalance(a.id, repFrom, repTo)}));
-  const expRows = expAccs.map(a=>({a, val:accountBalance(a.id, repFrom, repTo)}));
+  const expAccs = DB.accounts.filter(a=>a.type==='expense' && a.id!=='acc_cogs');
+  const revRows = revAccs.map(a=>({a, val:accountBalance(a.id, repFrom, repTo)})).filter(r=>Math.abs(r.val)>0.009);
+  const expRows = expAccs.map(a=>({a, val:accountBalance(a.id, repFrom, repTo)})).filter(r=>Math.abs(r.val)>0.009);
   const totalRev = revRows.reduce((s,r)=>s+r.val,0);
-  const totalExp = expRows.reduce((s,r)=>s+r.val,0);
+  const totalOpex = expRows.reduce((s,r)=>s+r.val,0);
   const cogs = accountBalance('acc_cogs', repFrom, repTo);
   const grossProfit = totalRev - cogs;
-  const net = totalRev-totalExp;
+  const net = grossProfit - totalOpex;
   const grossMargin = totalRev>0 ? (grossProfit/totalRev*100) : 0;
   const netMargin = totalRev>0 ? (net/totalRev*100) : 0;
+  const periodLabel = (repFrom||repTo) ? (fmtDate(repFrom||'—')+' — '+fmtDate(repTo||'—')) : 'كل الفترات';
+  const row = (label, val, opts={}) => `<tr>
+      <td style="${opts.indent?'padding-right:22px;color:var(--text-muted);':''}${opts.bold?'font-weight:700;':''}">${esc(label)}</td>
+      <td class="tnum" style="${opts.bold?'font-weight:700;':''}${val<0?'color:var(--danger);':''}">${opts.paren&&val>0?'('+money(val)+')':money(val)}</td>
+    </tr>`;
   return `
-    <h3 style="font-size:14.5px;color:var(--primary-dark);">الإيرادات</h3>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">عن الفترة: ${periodLabel}</div>
     <div class="table-wrap"><table><tbody>
-      ${revRows.map(r=>`<tr><td>${esc(r.a.name)}</td><td class="tnum">${money(r.val)}</td></tr>`).join('')}
-      <tr><td style="font-weight:700;">إجمالي الإيرادات</td><td class="tnum" style="font-weight:700;">${money(totalRev)}</td></tr>
-    </tbody></table></div>
-    <h3 style="font-size:14.5px;color:var(--primary-dark);margin-top:18px;">المصروفات</h3>
-    <div class="table-wrap"><table><tbody>
-      ${expRows.map(r=>`<tr><td>${esc(r.a.name)}</td><td class="tnum">${money(r.val)}</td></tr>`).join('')}
-      <tr><td style="font-weight:700;">إجمالي المصروفات</td><td class="tnum" style="font-weight:700;">${money(totalExp)}</td></tr>
+      <tr><td colspan="2" style="font-weight:700;color:var(--primary-dark);padding-top:10px;">الإيرادات</td></tr>
+      ${revRows.length===0?'<tr><td style="padding-right:22px;color:var(--text-muted);">لا توجد إيرادات</td><td></td></tr>':revRows.map(r=>row(r.a.name, r.val, {indent:true})).join('')}
+      ${row('إجمالي الإيرادات', totalRev, {bold:true})}
+
+      <tr><td colspan="2" style="padding-top:14px;">تكلفة البضاعة المباعة</td><td></td></tr>
+      ${row('(-) تكلفة البضاعة المباعة', cogs, {indent:true, paren:true})}
+      <tr><td colspan="2" style="border-top:1.5px solid var(--border);"></td></tr>
+      ${row('مجمل الربح (Gross Profit)', grossProfit, {bold:true})}
+
+      <tr><td colspan="2" style="font-weight:700;color:var(--primary-dark);padding-top:14px;">المصروفات التشغيلية</td></tr>
+      ${expRows.length===0?'<tr><td style="padding-right:22px;color:var(--text-muted);">لا توجد مصروفات</td><td></td></tr>':expRows.map(r=>row(r.a.name, r.val, {indent:true})).join('')}
+      ${row('(-) إجمالي المصروفات التشغيلية', totalOpex, {bold:true, paren:true})}
+      <tr><td colspan="2" style="border-top:1.5px solid var(--border);"></td></tr>
+      <tr><td style="font-weight:700;font-size:15px;">${net>=0?'صافي الربح':'صافي الخسارة'}</td><td class="tnum" style="font-weight:700;font-size:15px;${net>=0?'color:var(--success);':'color:var(--danger);'}">${money(net)}</td></tr>
     </tbody></table></div>
     <div class="stat-grid" style="margin-top:18px;">
-      <div class="stat-card"><div class="lbl">إجمالي الربح (قبل خصم المصروفات العامة)</div><div class="val">${money(grossProfit)}</div></div>
+      <div class="stat-card"><div class="lbl">مجمل الربح (Gross Profit)</div><div class="val">${money(grossProfit)}</div></div>
       <div class="stat-card gold"><div class="lbl">هامش الربح الإجمالي (Gross Margin)</div><div class="val">${grossMargin.toFixed(1)}%</div></div>
       <div class="stat-card ${net>=0?'green':'red'}"><div class="lbl">صافي الربح / الخسارة</div><div class="val">${money(net)}</div></div>
       <div class="stat-card ${netMargin>=0?'green':'red'}"><div class="lbl">هامش صافي الربح (Net Margin)</div><div class="val">${netMargin.toFixed(1)}%</div></div>
     </div>
-    <p style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">هامش الربح الإجمالي = (الإيرادات - تكلفة البضاعة المباعة) ÷ الإيرادات. هامش صافي الربح = صافي الربح ÷ الإيرادات (بعد خصم كل المصروفات).</p>
+    <p style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">هامش الربح الإجمالي = مجمل الربح ÷ الإيرادات. هامش صافي الربح = صافي الربح ÷ الإيرادات (بعد خصم تكلفة البضاعة المباعة وكل المصروفات التشغيلية).</p>
   `;
 }
 function reportCashFlow(){
@@ -7421,7 +7443,7 @@ function renderAccounts(){
         ${canManage?`<button class="btn btn-primary" onclick="openAccountModal()">${icon('plus')} حساب جديد</button>`:''}
       </div>
       ${!canManage?`<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px 0;">${icon('alert')} وضع العرض فقط - ما عندكش صلاحية إضافة أو تعديل أو حذف الحسابات.</p>`:''}
-      <div class="search-bar"><input placeholder="بحث بالكود أو الاسم..." value="${esc(accFilter)}" oninput="accFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_accFilter" placeholder="بحث بالكود أو الاسم..." value="${esc(accFilter)}" oninput="accFilter=this.value; renderKeepFocus('search_accFilter');"></div>
       <div class="table-wrap"><table>
         <thead><tr><th>الكود</th><th>اسم الحساب</th><th>النوع</th><th>الرصيد الحالي</th><th></th></tr></thead>
         <tbody>${list.sort((a,b)=>a.code.localeCompare(b.code)).map(a=>{
@@ -7503,7 +7525,7 @@ function renderJournalPage(){
           `:''}
         </div>
       </div>
-      <div class="search-bar"><input placeholder="بحث برقم القيد أو البيان..." value="${esc(journalFilter)}" oninput="journalFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_journalFilter" placeholder="بحث برقم القيد أو البيان..." value="${esc(journalFilter)}" oninput="journalFilter=this.value; renderKeepFocus('search_journalFilter');"></div>
       ${list.length===0 ? emptyState('لا توجد قيود بعد','ستظهر هنا القيود التلقائية من الفواتير، ويمكنك أيضاً إضافة قيد يدوي') : `
       <div class="table-wrap"><table>
         <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>النوع</th><th>الإجمالي</th><th></th></tr></thead>
@@ -7871,7 +7893,7 @@ function renderExpensesTab(){
         </div>
       </div>
       <div class="search-bar">
-        <input placeholder="بحث بالبيان..." value="${esc(expFilter)}" oninput="expFilter=this.value; render();">
+        <input id="search_expFilter" placeholder="بحث بالبيان..." value="${esc(expFilter)}" oninput="expFilter=this.value; renderKeepFocus('search_expFilter');">
         ${can('view_all_expenses')?`<select onchange="expUserFilter=this.value; render();" style="max-width:200px;">
           <option value="">كل الموظفين</option>
           ${employeeList.map(u=>`<option value="${esc(u)}" ${expUserFilter===u?'selected':''}>${esc(u)}</option>`).join('')}
@@ -7976,7 +7998,7 @@ function renderCustodyTab(){
         <h2>العهد (${list.length})</h2>
         <button class="btn btn-primary" onclick="openCustodyModal()">${icon('plus')} عهدة جديدة</button>
       </div>
-      <div class="search-bar"><input placeholder="بحث باسم الموظف..." value="${esc(custodyFilter)}" oninput="custodyFilter=this.value; render();"></div>
+      <div class="search-bar"><input id="search_custodyFilter" placeholder="بحث باسم الموظف..." value="${esc(custodyFilter)}" oninput="custodyFilter=this.value; renderKeepFocus('search_custodyFilter');"></div>
       ${list.length===0?emptyState('لا توجد عهد مسجلة','اصرف أول عهدة لموظف (زي مندوب أو مسؤول مشتريات) لمتابعة مصروفاته منها', false):`
       <div class="table-wrap"><table>
         <thead><tr><th>الرقم</th><th>الموظف</th><th>المبلغ الأساسي</th><th>الرصيد الحالي</th><th>الحالة</th><th></th></tr></thead>
@@ -8555,7 +8577,7 @@ function renderActivityPage(){
         <h2>${isAdm?'سجل حركات كل المستخدمين':'سجل حركاتك'} (${list.length})</h2>
       </div>
       <div class="row2" style="margin-bottom:14px;">
-        <input placeholder="بحث بالتفاصيل أو المستخدم..." value="${esc(actFilter)}" oninput="actFilter=this.value; render();">
+        <input id="search_actFilter" placeholder="بحث بالتفاصيل أو المستخدم..." value="${esc(actFilter)}" oninput="actFilter=this.value; renderKeepFocus('search_actFilter');">
         <select onchange="actSectionFilter=this.value; render();">
           <option value="">كل الأقسام</option>
           ${sectionOpts}

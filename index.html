@@ -1170,6 +1170,13 @@ function adjustStock(p, delta){
     p.stockByWarehouse.wh_main = (p.stockByWarehouse.wh_main||0) + delta;
   }
 }
+function applyWeightedAverageCost(p, incomingQty, incomingUnitCost){
+  if(!p || incomingQty<=0) return;
+  const existingQty = p.quantity||0;
+  const existingCost = p.purchasePrice||0;
+  const newQty = existingQty + incomingQty;
+  p.purchasePrice = newQty>0.0001 ? ((existingQty*existingCost)+(incomingQty*incomingUnitCost))/newQty : incomingUnitCost;
+}
 function logStockMove(productId, qtyChange, type, refNumber, memo){
   if(!DB.stockMoves) DB.stockMoves = [];
   DB.stockMoves.push({ id:uid(), productId, qtyChange, type, refNumber:refNumber||'', memo:memo||'', date:todayISO(), createdAt:Date.now(), createdBy:currentUserName() });
@@ -2462,7 +2469,7 @@ function completeProductionOrder(id, wastePercent, defectiveQty){
     }
     const goodQty = o.producedQty - (defectiveQty||0);
     const finished = productById(o.producedProductId);
-    finished.purchasePrice = o.unitCost;
+    applyWeightedAverageCost(finished, goodQty, o.unitCost);
     adjustStock(finished, goodQty);
     logStockMove(o.producedProductId, goodQty, 'production_output', o.number, 'ناتج تصنيع - '+o.bomName);
     const defectiveCost = (defectiveQty||0) * o.unitCost;
@@ -4644,7 +4651,7 @@ function openPurchaseModal(editId){
       let oldPurchItems = editInv.items;
       editInv.items.forEach(it=>{ const p = productById(it.productId); if(p) adjustStock(p, -it.qty); });
       removeInvoiceMainEntry(editInv.id);
-      items.forEach(it=>{ const p = productById(it.productId); adjustStock(p, it.qty); p.purchasePrice = it.price*exchangeRate; });
+      items.forEach(it=>{ const p = productById(it.productId); if(p) applyWeightedAverageCost(p, it.qty, it.price*exchangeRate); adjustStock(p, it.qty); });
 
       const lines = [
         {accountId:'acc_inventory', debit:subtotal-discountAmount, credit:0},
@@ -5211,8 +5218,8 @@ function submitGoodsReceipt(id, actualQtys, notes){
       const actualQty = actualQtys[idx];
       const p = productById(it.productId);
       const unitPrice = it.price*(inv.exchangeRate||1);
+      applyWeightedAverageCost(p, actualQty, unitPrice);
       adjustStock(p, actualQty);
-      p.purchasePrice = unitPrice;
       logStockMove(it.productId, actualQty, 'purchase', inv.number, 'استلام فاتورة شراء بالمخزن'+(actualQty!==it.qty?' (مطلوب '+it.qty+')':''));
       it.actualReceivedQty = actualQty;
       const expectedValue = it.qty * unitPrice;

@@ -8768,6 +8768,15 @@ function renderSettings(){
     </div>`:''}
     ${canSettings?`
     <div class="card" style="max-width:520px;">
+      <div class="card-head"><h2>تحديث الباركود الناقص في الفواتير القديمة</h2></div>
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px 0;">
+        لو فيه فواتير بيع أو شراء قديمة أصنافها من غير باركود (رغم إن المنتج نفسه عنده باركود محفوظ حالياً)، الأداة دي بتكمّله تلقائياً من غير ما تلمس الكميات أو الأسعار أو أي قيد محاسبي.
+      </p>
+      <div id="barcodeBackfillStatus"></div>
+      <button class="btn btn-outline" onclick="backfillMissingBarcodes()">${icon('journal')} تحديث الباركود الناقص الآن</button>
+    </div>`:''}
+    ${canSettings?`
+    <div class="card" style="max-width:520px;">
       <div class="card-head"><h2>قفل الفترات المحاسبية</h2></div>
       <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px 0;">
         أي فاتورة أو مصروف أو قيد بتاريخ <b>قبل أو يساوي</b> التاريخ ده هيتمنع من الحفظ أو الاعتماد، عشان تحمي بياناتك من أي تعديل بعد ما تقفل شهر أو فترة معينة رسمياً.
@@ -8910,6 +8919,31 @@ function autoBackupOnLoad(){
     const hoursSince = (Date.now()-lastBackup)/3600000;
     if(hoursSince>=20) runAutoBackup(false);
   }).catch(()=>{});
+}
+function backfillMissingBarcodes(){
+  if(!requirePerm('manage_settings','تحديث الباركود الناقص')) return;
+  let affectedItems = 0;
+  const affectedInvoiceIds = new Set();
+  ['sales','purchases'].forEach(kind=>{
+    DB[kind].forEach(inv=>{
+      inv.items.forEach(it=>{
+        if(!it.barcode){
+          const p = productById(it.productId);
+          if(p && p.barcode){
+            it.barcode = p.barcode;
+            affectedItems++;
+            affectedInvoiceIds.add(inv.id);
+          }
+        }
+      });
+    });
+  });
+  if(affectedItems===0){ toast('كل الأصناف في الفواتير عندها باركود بالفعل - مفيش حاجة تتحدث'); return; }
+  confirmAction('تحديث الباركود الناقص', 'هيتم تحديث '+affectedItems+' صنف في '+affectedInvoiceIds.size+' فاتورة. مفيش أي تأثير على الكميات أو الأسعار أو القيود المحاسبية. هل أنت متأكد؟', ()=>{
+    persist('sales'); persist('purchases');
+    logActivity('settings', 'تحديث الباركود الناقص في '+affectedItems+' صنف عبر '+affectedInvoiceIds.size+' فاتورة');
+    closeModal(); render(); toast('تم تحديث '+affectedItems+' صنف بنجاح');
+  });
 }
 function downloadBackup(){
   if(!requirePerm('manage_settings','تنزيل نسخة احتياطية')) return;

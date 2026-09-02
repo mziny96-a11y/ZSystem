@@ -1972,7 +1972,7 @@ function renderInventory(){
               <button class="btn btn-outline btn-icon btn-sm" onclick="openStockCard('${p.id}')" title="كارت الصنف">${icon('journal')}</button>
               <button class="btn btn-outline btn-icon btn-sm" onclick="openPriceHistoryModal('${p.id}')" title="تاريخ أسعار الشراء">${icon('statement')}</button>
               ${commentsButtonHtml('product', p.id)}
-              <button class="btn btn-outline btn-icon btn-sm" onclick="openStockAdjustModal('${p.id}')" title="تسوية مخزون">${icon('scale')}</button>
+              ${can('manage_accounts')?`<button class="btn btn-outline btn-icon btn-sm" onclick="openStockAdjustModal('${p.id}')" title="تسوية مخزون">${icon('scale')}</button>`:''}
               ${can('delete_records')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteProduct('${p.id}')" title="حذف">${icon('trash')}</button>`:''}
             </div>
           </div>`).join('')}
@@ -3134,6 +3134,7 @@ function updateTransferAvail(){
   if(el) el.textContent = fmt(p.stockByWarehouse[from]||0);
 }
 function openStockAdjustModal(productId){
+  if(!requirePerm('manage_accounts','تسوية المخزون')) return;
   const p = productById(productId);
   if(!p) return;
   const body = `
@@ -3462,11 +3463,24 @@ function duplicateProduct(id){
   toast('عدّل بيانات النسخة واضغط حفظ');
   openProductModal(null, prefill);
 }
+function isProductUsedAnywhere(id){
+  return DB.sales.some(s=>s.items.some(it=>it.productId===id))
+    || DB.purchases.some(s=>s.items.some(it=>it.productId===id))
+    || DB.quotations.some(s=>s.items.some(it=>it.productId===id))
+    || DB.purchaseOrders.some(s=>s.items.some(it=>it.productId===id))
+    || DB.testerHandouts.some(s=>s.items.some(it=>it.productId===id))
+    || DB.consignShipments.some(s=>s.items.some(it=>it.productId===id))
+    || DB.consignReports.some(s=>s.items.some(it=>it.productId===id))
+    || DB.returns.some(s=>s.items.some(it=>it.productId===id))
+    || DB.landedCosts.some(s=>s.items.some(it=>it.productId===id))
+    || DB.boms.some(b=>b.productId===id || b.items.some(it=>it.materialId===id))
+    || DB.productionOrders.some(o=>o.producedProductId===id || o.materials.some(m=>m.productId===id));
+}
 function deleteProduct(id){
   if(!requirePerm('delete_records','حذف المنتجات')) return;
   const p = productById(id);
-  const used = DB.sales.some(s=>s.items.some(it=>it.productId===id)) || DB.purchases.some(s=>s.items.some(it=>it.productId===id));
-  if(used){ toast('لا يمكن حذف هذا المنتج لوجود فواتير مرتبطة به'); return; }
+  const used = isProductUsedAnywhere(id);
+  if(used){ toast('لا يمكن حذف هذا المنتج لوجود مستندات مرتبطة به (فاتورة، إذن، وصفة تصنيع، أو غيرها)'); return; }
   confirmAction('حذف المنتج', 'هل تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.', ()=>{
     DB.products = DB.products.filter(x=>x.id!==id);
     DB.priceLists.forEach(pl=>{ if(pl.prices && pl.prices[id]!=null) delete pl.prices[id]; });
@@ -6343,7 +6357,7 @@ function openConsignReportModal(){
       const p = productById(productId);
       const held = consignStockFor(partyId, productId, branchId||null);
       if(qtySold>held+0.001){ toast('كمية البيع من "'+p.name+'" أكبر من رصيد الأمانة لديه'); return false; }
-      items.push({productId, name:p.name, code:p.code||'', qtySold, price:p.salePrice, cost:p.purchasePrice, total:qtySold*p.salePrice});
+      items.push({productId, name:p.name, code:p.code||'', barcode:p.barcode||'', qtySold, price:p.salePrice, cost:p.purchasePrice, total:qtySold*p.salePrice});
     }
     if(items.length===0){ toast('أدخل كمية مباعة لصنف واحد على الأقل'); return false; }
     if(!checkPeriodLock(date)) return false;
@@ -6376,7 +6390,7 @@ function openConsignReportModal(){
       ], 'consign_report', rep.id);
     }
     logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+' بقيمة '+money(total));
-    const invItems = items.map(it=>({productId:it.productId, name:it.name, code:it.code, qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة'}));
+    const invItems = items.map(it=>({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة'}));
     const mirrorInv = {
       id:uid(), number:nextInvoiceNo(), date, partyId, partyName:cust.name, poNumber,
       branchId:branchId||null, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null,
@@ -6639,8 +6653,8 @@ function exportSelectedProducts(){
 function deleteSelectedProducts(){
   if(!requirePerm('delete_records','حذف المنتجات')) return;
   const ids = [...selectedProducts];
-  const usedIds = ids.filter(id=>DB.sales.some(s=>s.items.some(it=>it.productId===id)) || DB.purchases.some(s=>s.items.some(it=>it.productId===id)));
-  confirmAction('حذف '+ids.length+' منتج', usedIds.length>0 ? (usedIds.length+' من المنتجات المحددة مستخدمة في فواتير موجودة ولن تُحذف. سيتم حذف الباقي فقط. متابعة؟') : 'هل أنت متأكد من حذف المنتجات المحددة؟', ()=>{
+  const usedIds = ids.filter(id=>isProductUsedAnywhere(id));
+  confirmAction('حذف '+ids.length+' منتج', usedIds.length>0 ? (usedIds.length+' من المنتجات المحددة مستخدمة في مستندات موجودة ولن تُحذف. سيتم حذف الباقي فقط. متابعة؟') : 'هل أنت متأكد من حذف المنتجات المحددة؟', ()=>{
     let deleted=0;
     ids.forEach(id=>{
       if(!usedIds.includes(id)){

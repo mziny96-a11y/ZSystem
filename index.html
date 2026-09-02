@@ -6357,7 +6357,7 @@ function openConsignReportModal(){
       const p = productById(productId);
       const held = consignStockFor(partyId, productId, branchId||null);
       if(qtySold>held+0.001){ toast('كمية البيع من "'+p.name+'" أكبر من رصيد الأمانة لديه'); return false; }
-      items.push({productId, name:p.name, code:p.code||'', barcode:p.barcode||'', qtySold, price:p.salePrice, cost:p.purchasePrice, total:qtySold*p.salePrice});
+      items.push({productId, name:p.name, code:p.code||'', barcode:p.barcode||'', notes:p.notes||'', qtySold, price:p.salePrice, cost:p.purchasePrice, total:qtySold*p.salePrice});
     }
     if(items.length===0){ toast('أدخل كمية مباعة لصنف واحد على الأقل'); return false; }
     if(!checkPeriodLock(date)) return false;
@@ -6390,7 +6390,7 @@ function openConsignReportModal(){
       ], 'consign_report', rep.id);
     }
     logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+' بقيمة '+money(total));
-    const invItems = items.map(it=>({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة'}));
+    const invItems = items.map(it=>({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', notes:it.notes||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة'}));
     const mirrorInv = {
       id:uid(), number:nextInvoiceNo(), date, partyId, partyName:cust.name, poNumber,
       branchId:branchId||null, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null,
@@ -8768,12 +8768,12 @@ function renderSettings(){
     </div>`:''}
     ${canSettings?`
     <div class="card" style="max-width:520px;">
-      <div class="card-head"><h2>تحديث الباركود الناقص في الفواتير القديمة</h2></div>
+      <div class="card-head"><h2>تحديث بيانات الأصناف الناقصة في الفواتير القديمة</h2></div>
       <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px 0;">
-        لو فيه فواتير بيع أو شراء قديمة أصنافها من غير باركود (رغم إن المنتج نفسه عنده باركود محفوظ حالياً)، الأداة دي بتكمّله تلقائياً من غير ما تلمس الكميات أو الأسعار أو أي قيد محاسبي.
+        لو فيه فواتير بيع أو شراء قديمة أصنافها من غير باركود أو وصف (رغم إن المنتج نفسه عنده البيانات دي محفوظة حالياً)، الأداة دي بتكمّلهم تلقائياً من غير ما تلمس الكميات أو الأسعار أو أي قيد محاسبي.
       </p>
       <div id="barcodeBackfillStatus"></div>
-      <button class="btn btn-outline" onclick="backfillMissingBarcodes()">${icon('journal')} تحديث الباركود الناقص الآن</button>
+      <button class="btn btn-outline" onclick="backfillMissingBarcodes()">${icon('journal')} تحديث البيانات الناقصة الآن</button>
     </div>`:''}
     ${canSettings?`
     <div class="card" style="max-width:520px;">
@@ -8921,27 +8921,25 @@ function autoBackupOnLoad(){
   }).catch(()=>{});
 }
 function backfillMissingBarcodes(){
-  if(!requirePerm('manage_settings','تحديث الباركود الناقص')) return;
+  if(!requirePerm('manage_settings','تحديث بيانات الأصناف الناقصة')) return;
   let affectedItems = 0;
   const affectedInvoiceIds = new Set();
   ['sales','purchases'].forEach(kind=>{
     DB[kind].forEach(inv=>{
       inv.items.forEach(it=>{
-        if(!it.barcode){
-          const p = productById(it.productId);
-          if(p && p.barcode){
-            it.barcode = p.barcode;
-            affectedItems++;
-            affectedInvoiceIds.add(inv.id);
-          }
-        }
+        const p = productById(it.productId);
+        if(!p) return;
+        let changed = false;
+        if(!it.barcode && p.barcode){ it.barcode = p.barcode; changed = true; }
+        if(!it.notes && p.notes){ it.notes = p.notes; changed = true; }
+        if(changed){ affectedItems++; affectedInvoiceIds.add(inv.id); }
       });
     });
   });
-  if(affectedItems===0){ toast('كل الأصناف في الفواتير عندها باركود بالفعل - مفيش حاجة تتحدث'); return; }
-  confirmAction('تحديث الباركود الناقص', 'هيتم تحديث '+affectedItems+' صنف في '+affectedInvoiceIds.size+' فاتورة. مفيش أي تأثير على الكميات أو الأسعار أو القيود المحاسبية. هل أنت متأكد؟', ()=>{
+  if(affectedItems===0){ toast('كل الأصناف في الفواتير عندها الباركود والوصف بالفعل - مفيش حاجة تتحدث'); return; }
+  confirmAction('تحديث بيانات الأصناف الناقصة', 'هيتم تحديث '+affectedItems+' صنف في '+affectedInvoiceIds.size+' فاتورة (باركود و/أو وصف ناقص). مفيش أي تأثير على الكميات أو الأسعار أو القيود المحاسبية. هل أنت متأكد؟', ()=>{
     persist('sales'); persist('purchases');
-    logActivity('settings', 'تحديث الباركود الناقص في '+affectedItems+' صنف عبر '+affectedInvoiceIds.size+' فاتورة');
+    logActivity('settings', 'تحديث بيانات الأصناف الناقصة في '+affectedItems+' صنف عبر '+affectedInvoiceIds.size+' فاتورة');
     closeModal(); render(); toast('تم تحديث '+affectedItems+' صنف بنجاح');
   });
 }

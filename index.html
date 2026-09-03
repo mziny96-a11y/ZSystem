@@ -5782,7 +5782,7 @@ function deleteConsignInvoice(invId){
   const inv = DB.sales.find(s=>s.id===invId);
   if(!inv || !inv.fromConsignment) return;
   if(!checkPeriodLock(inv.date)) return;
-  const reportIds = inv.consignReportIds || [];
+  const reportIds = inv.consignReportIds || (inv.consignReportId ? [inv.consignReportId] : []);
   const isMultiBranch = reportIds.length>1;
   const branchNames = [...new Set(inv.items.map(it=>it.branchName).filter(Boolean))];
   const msg = isMultiBranch
@@ -5803,15 +5803,16 @@ function deleteConsignReport(id){
   const rep = DB.consignReports.find(x=>x.id===id);
   if(!rep) return;
   if(!checkPeriodLock(rep.date)) return;
-  const mirrorInv = DB.sales.find(s=>(s.consignReportIds||[]).includes(rep.id));
-  const isShared = mirrorInv && (mirrorInv.consignReportIds||[]).length>1;
+  const mirrorInv = DB.sales.find(s=>(s.consignReportIds||[]).includes(rep.id) || s.consignReportId===rep.id);
+  const linkedReportIds = mirrorInv ? (mirrorInv.consignReportIds || (mirrorInv.consignReportId ? [mirrorInv.consignReportId] : [])) : [];
+  const isShared = linkedReportIds.length>1;
   const msg = isShared
     ? 'التقرير ده جزء من فاتورة واحدة مجمّعة لأكتر من فرع (رقم '+mirrorInv.number+') - حذفه هيحذف الفاتورة كلها وكل فروعها، وترجع كل الكميات كرصيد أمانة. لو محتاج تصحيح فرع واحد بس، سجّل تقرير جديد بعد كده. هل أنت متأكد؟'
     : 'سيتم حذف فاتورة البيع المرتبطة بهذا التقرير وعكس القيد المحاسبي بالكامل (الكمية المباعة هترجع تاني كرصيد أمانة لدى المتجر). هل أنت متأكد؟';
   confirmAction('حذف تقرير المبيعات', msg, ()=>{
     if(mirrorInv){
       removeJournalBySource(mirrorInv.id);
-      const otherReportIds = (mirrorInv.consignReportIds||[]).filter(rid=>rid!==rep.id);
+      const otherReportIds = linkedReportIds.filter(rid=>rid!==rep.id);
       DB.consignReports.filter(r=>otherReportIds.includes(r.id)).forEach(r=>{
         DB.consignReports = DB.consignReports.filter(x=>x.id!==r.id);
       });

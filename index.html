@@ -701,6 +701,7 @@ const DEFAULT_ACCOUNTS = [
   {id:'acc_inv_adj', code:'5200', name:'فروقات جرد المخزون', type:'expense'},
   {id:'acc_consign_inv', code:'1250', name:'بضاعة أمانة لدى الغير', type:'asset'},
   {id:'acc_consign_comm', code:'5300', name:'عمولات بيع بالأمانة', type:'expense'},
+  {id:'acc_consign_comm_payable', code:'2150', name:'عمولات متاجر الأمانة المستحقة الدفع', type:'liability'},
   {id:'acc_samples', code:'5400', name:'عينات وتسترز مجانية (تسويق)', type:'expense'},
   {id:'acc_scrap', code:'5500', name:'هالك وتوالف التصنيع', type:'expense'},
   {id:'acc_wip', code:'1225', name:'أعمال تحت التنفيذ (تصنيع)', type:'asset'},
@@ -5685,6 +5686,8 @@ function renderConsignmentPage(){
           <button class="btn btn-outline" onclick="openTesterModal()">${icon('duplicate')} توزيع عينات / تسترز</button>
           <button class="btn btn-outline" onclick="openConsignShipmentModal('return')">${icon('undo')} مرتجع بضاعة أمانة</button>
           <button class="btn btn-outline" onclick="openConsignReportModal()">${icon('statement')} تسجيل تقرير مبيعات</button>
+          <button class="btn btn-outline" onclick="openPayConsignCommissionModal()">${icon('money')} دفع عمولة متجر</button>
+          <button class="btn btn-outline" onclick="openCategoryCommissionRatesModal()">${icon('edit')} معدلات عمولة الفئات</button>
           <button class="btn btn-primary" onclick="openConsignShipmentModal('out')">${icon('plus')} إذن صرف بضاعة أمانة</button>
         </div>
       </div>
@@ -6349,6 +6352,98 @@ function addConsignItemRow(type){
   `;
   wrap.appendChild(div);
 }
+function consignCommissionOwed(customerId){
+  return -partyBalance('customer', customerId, 'acc_consign_comm_payable');
+}
+function openCategoryCommissionRatesModal(){
+  if(!requirePerm('manage_settings','إدارة معدلات عمولة الفئات')) return;
+  const categories = [...new Set(DB.products.map(p=>p.category).filter(c=>c&&c.trim()))].sort();
+  if(categories.length===0){ toast('مفيش فئات منتجات متسجلة بعد - حدد فئة لكل منتج الأول من صفحة المخزون'); return; }
+  const rates = DB.settings.categoryCommissionRates || {};
+  const body = `
+    <p style="font-size:12.5px;color:var(--text-muted);margin-top:0;">حدد معدل عمولة مخصص لأي فئة - أي فئة تسيبها فاضية هتستخدم المعدل الافتراضي اللي بتدخله في كل تقرير مبيعات.</p>
+    <div class="item-rows">
+      <div class="item-row head-row" style="grid-template-columns:1.6fr 1fr 1fr;"><div>الفئة</div><div>النوع</div><div>القيمة</div></div>
+      ${categories.map(cat=>{
+        const r = rates[cat] || {};
+        return `<div class="item-row" style="grid-template-columns:1.6fr 1fr 1fr;">
+          <div>${esc(cat)}</div>
+          <div><select class="cat-comm-type" data-cat="${esc(cat)}">
+            <option value="" ${!r.type?'selected':''}>افتراضي</option>
+            <option value="percent" ${r.type==='percent'?'selected':''}>نسبة %</option>
+            <option value="fixed" ${r.type==='fixed'?'selected':''}>ثابت/قطعة</option>
+          </select></div>
+          <div><input type="number" class="cat-comm-value" data-cat="${esc(cat)}" step="0.01" value="${r.value!=null?r.value:''}" placeholder="القيمة"></div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+  openModal('معدلات عمولة الفئات', body, ()=>{
+    const newRates = {};
+    document.querySelectorAll('.cat-comm-type').forEach(sel=>{
+      const cat = sel.dataset.cat;
+      const type = sel.value;
+      const valInput = document.querySelector('.cat-comm-value[data-cat="'+CSS.escape(cat)+'"]');
+      const value = valInput ? parseFloat(valInput.value) : NaN;
+      if(type && !isNaN(value)){ newRates[cat] = {type, value}; }
+    });
+    DB.settings.categoryCommissionRates = newRates;
+    persist('settings');
+    logActivity('settings', 'تحديث معدلات عمولة الفئات');
+    closeModal(); render(); toast('تم الحفظ بنجاح');
+  });
+}
+function commissionForItem(productId, defaultType, defaultValue){
+  const p = productById(productId);
+  const cat = p ? p.category : null;
+  const rates = DB.settings.categoryCommissionRates || {};
+  if(cat && rates[cat]) return rates[cat];
+  return {type:defaultType, value:defaultValue};
+}
+function openPayConsignCommissionModal(){
+  if(!requirePerm('manage_accounts','دفع عمولة متجر')) return;
+  const storesWithOwed = DB.customers.filter(c=>consignCommissionOwed(c.id)>0.009);
+  const custOpts = DB.customers.map(c=>`<option value="${c.id}">${esc(c.name)}${consignCommissionOwed(c.id)>0.009?' (مستحق '+money(consignCommissionOwed(c.id))+')':''}</option>`).join('');
+  const body = `
+    ${storesWithOwed.length===0?`<div class="alert-bar">${icon('alert')}<div>مفيش عمولات مستحقة لأي متجر حالياً.</div></div>`:''}
+    <div class="field"><label>المتجر *</label><select id="f_party" onchange="onPayCommissionPartyChange()"><option value="">اختر متجر...</option>${custOpts}</select></div>
+    <p id="commissionOwedNote" style="font-size:12.5px;color:var(--text-muted);margin:6px 0;"></p>
+    <div class="row2" style="margin-top:8px;">
+      <div class="field"><label>المبلغ المدفوع *</label><input id="f_amt" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${todayISO()}"></div>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>الخزينة / الحساب البنكي المدفوع منه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
+    <div class="field" style="margin-top:10px;"><label>ملاحظات</label><input id="f_memo" placeholder="مثال: عمولة شهر أغسطس"></div>
+  `;
+  openModal('دفع عمولة متجر', body, ()=>{
+    const partyId = document.getElementById('f_party').value;
+    if(!partyId){ toast('اختر المتجر'); return false; }
+    const cust = customerById(partyId);
+    const owed = consignCommissionOwed(partyId);
+    const amt = parseFloat(document.getElementById('f_amt').value)||0;
+    if(amt<=0){ toast('أدخل مبلغ صحيح'); return false; }
+    if(amt>owed+0.009){ toast('المبلغ أكبر من العمولة المستحقة لهذا المتجر ('+money(owed)+')'); return false; }
+    const date = document.getElementById('f_date').value || todayISO();
+    const cashAcc = document.getElementById('f_cashacc').value;
+    const memo = document.getElementById('f_memo').value.trim();
+    if(!checkPeriodLock(date)) return false;
+    postJournal(date, 'دفع عمولة متجر '+cust.name+(memo?' - '+memo:''), [
+      {accountId:'acc_consign_comm_payable', debit:amt, credit:0, partyType:'customer', partyId, partyName:cust.name},
+      {accountId:cashAcc, debit:0, credit:amt},
+    ], 'consign_commission_payment', uid());
+    logActivity('consignment', 'دفع عمولة متجر '+cust.name+' بمبلغ '+money(amt));
+    closeModal(); render(); toast('تم تسجيل السند بنجاح');
+  });
+}
+function onPayCommissionPartyChange(){
+  const partyId = document.getElementById('f_party').value;
+  const note = document.getElementById('commissionOwedNote');
+  const amtEl = document.getElementById('f_amt');
+  if(!partyId){ note.textContent = ''; return; }
+  const owed = consignCommissionOwed(partyId);
+  note.textContent = 'العمولة المستحقة لهذا المتجر حالياً: '+money(owed);
+  if(amtEl) amtEl.value = owed>0 ? owed : 0;
+}
 function openConsignReportModal(){
   if(DB.customers.length===0){ toast('أضف عميل (متجر) أولاً'); return; }
   const customersOpts = DB.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
@@ -6366,7 +6461,15 @@ function openConsignReportModal(){
     <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px 0;">أدخل الكمية المباعة فعلياً لكل صنف بناءً على تقرير المتجر الدوري. الكمية القصوى = رصيد الأمانة الحالي.</p>
     <div id="consignReportItems"><p style="font-size:12.5px;color:var(--text-muted);">اختر المتجر أولاً لعرض أصناف الأمانة لديه.</p></div>
     <div class="row3" style="margin-top:14px;">
-      <div class="field"><label>نسبة عمولة المتجر %</label><input id="f_commission" type="number" step="0.01" value="0" oninput="updateConsignReportTotals()"></div>
+      <div class="field"><label>نوع عمولة المتجر (الافتراضي - قابل للتخصيص حسب الفئة)</label>
+        <div style="display:flex;gap:6px;">
+          <select id="f_commission_type" onchange="onConsignCommissionTypeChange()" style="flex:1;">
+            <option value="percent">نسبة % من المبيعات</option>
+            <option value="fixed">مبلغ ثابت لكل قطعة</option>
+          </select>
+          <input id="f_commission" type="number" step="0.01" value="0" oninput="updateConsignReportTotals()" style="flex:1;" placeholder="النسبة أو المبلغ">
+        </div>
+      </div>
       <div class="field"><label>نسبة الضريبة %</label><input id="f_tax_rate" type="number" step="0.01" value="${dTax}" oninput="updateConsignReportTotals()"></div>
       <div class="field" style="display:flex;align-items:flex-end;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:9px;">
@@ -6378,8 +6481,8 @@ function openConsignReportModal(){
     <div style="margin-top:8px;">
       <div class="tot-line"><span>إجمالي المبيعات</span><span class="tnum" id="crSubtotal">${money(0)}</span></div>
       <div class="tot-line"><span>الضريبة</span><span class="tnum" id="crTax">${money(0)}</span></div>
-      <div class="tot-line"><span>عمولة المتجر</span><span class="tnum" id="crCommission">${money(0)}</span></div>
-      <div class="tot-line grand"><span>صافي المستحق لنا</span><span class="tnum" id="crTotal">${money(0)}</span></div>
+      <div class="tot-line"><span>عمولة مستحقة للمتجر (منفصلة، هتتسجل كسند دفع لاحقاً)</span><span class="tnum" id="crCommission">${money(0)}</span></div>
+      <div class="tot-line grand"><span>إجمالي المستحق من المتجر (قيمة البيع)</span><span class="tnum" id="crTotal">${money(0)}</span></div>
       <div class="field" style="margin-top:8px;"><label>الخزينة / الحساب البنكي عند التحصيل الآن</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
       <div class="field"><label>المبلغ المُحصَّل الآن (اختياري)</label><input id="f_paid" type="number" step="0.01" value="0"></div>
     </div>
@@ -6409,7 +6512,8 @@ function openConsignReportModal(){
     if(!checkPeriodLock(date)) return false;
     const taxEnabled = document.getElementById('f_tax_enabled').checked;
     const taxRate = parseFloat(document.getElementById('f_tax_rate').value)||0;
-    const commissionPercent = parseFloat(document.getElementById('f_commission').value)||0;
+    const commissionType = document.getElementById('f_commission_type').value||'percent';
+    const commissionValue = parseFloat(document.getElementById('f_commission').value)||0;
     const cashAcc = document.getElementById('f_cashacc').value;
     const paidTotal = parseFloat(document.getElementById('f_paid').value)||0;
     const reportIds = [];
@@ -6421,20 +6525,23 @@ function openConsignReportModal(){
       const branch = branchId ? (cust.branches||[]).find(b=>b.id===branchId) : null;
       const subtotal = items.reduce((s,it)=>s+it.total,0);
       const taxAmount = taxEnabled ? subtotal*taxRate/100 : 0;
-      const commissionAmount = subtotal*commissionPercent/100;
-      const total = subtotal + taxAmount - commissionAmount;
+      const commissionAmount = items.reduce((s,it)=>{
+        const rate = commissionForItem(it.productId, commissionType, commissionValue);
+        return s + (rate.type==='fixed' ? it.qtySold*rate.value : it.total*rate.value/100);
+      },0);
+      const total = subtotal + taxAmount;
       const cost = items.reduce((s,it)=>s+it.qtySold*(it.cost||0),0);
-      const rep = { id:uid(), number:nextNumber(DB.consignReports,'CSR'), date, customerId:partyId, customerName:cust.name, branchId, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null, poNumber, items, subtotal, taxEnabled, taxRate, taxAmount, commissionPercent, commissionAmount, total, paidAmount:0, createdAt:Date.now(), createdBy:currentUserName() };
+      const rep = { id:uid(), number:nextNumber(DB.consignReports,'CSR'), date, customerId:partyId, customerName:cust.name, branchId, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null, poNumber, items, subtotal, taxEnabled, taxRate, taxAmount, commissionType, commissionValue, commissionAmount, total, paidAmount:0, createdAt:Date.now(), createdBy:currentUserName() };
       DB.consignReports.push(rep);
       reportIds.push(rep.id);
       items.forEach(it=>{ logStockMove(it.productId, -it.qtySold, 'consign_sold', rep.number, 'مبيعات أمانة - '+cust.name+(branch?' - '+branch.name:'')); });
-      logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+(branch?' - '+branch.name:'')+' بقيمة '+money(total));
+      logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+(branch?' - '+branch.name:'')+' بقيمة '+money(total)+(commissionAmount>0?' (عمولة مستحقة '+money(commissionAmount)+')':''));
       items.forEach(it=>{
         allInvItems.push({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', notes:it.notes||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة', branchName:branch?branch.name:'بدون فرع'});
       });
       grandSubtotal += subtotal; grandTax += taxAmount; grandCommission += commissionAmount; grandCost += cost;
     });
-    const grandTotal = grandSubtotal + grandTax - grandCommission;
+    const grandTotal = grandSubtotal + grandTax;
     const paid = Math.min(paidTotal, grandTotal);
     persist('consignReports');
     const lines = [
@@ -6442,15 +6549,18 @@ function openConsignReportModal(){
       {accountId:'acc_sales', debit:0, credit:grandSubtotal},
     ];
     if(grandTax>0) lines.push({accountId:'acc_vat_out', debit:0, credit:grandTax});
-    if(grandCommission>0) lines.push({accountId:'acc_consign_comm', debit:grandCommission, credit:0});
     if(grandCost>0){ lines.push({accountId:'acc_cogs', debit:grandCost, credit:0}); lines.push({accountId:'acc_consign_inv', debit:0, credit:grandCost}); }
+    if(grandCommission>0){
+      lines.push({accountId:'acc_consign_comm', debit:grandCommission, credit:0});
+      lines.push({accountId:'acc_consign_comm_payable', debit:0, credit:grandCommission, partyType:'customer', partyId, partyName:cust.name});
+    }
     const mirrorInv = {
       id:uid(), number:nextInvoiceNo(), date, partyId, partyName:cust.name, poNumber,
       branchId:null, branchName:branchKeys.length>1?null:(byBranch[branchKeys[0]]&&branchKeys[0]?((cust.branches||[]).find(b=>b.id===branchKeys[0])||{}).name:null), branchAddress:null,
       items:allInvItems, subtotal:grandSubtotal, discountType:'amount', discountValue:0, discountAmount:0,
       taxEnabled, taxRate, taxAmount:grandTax, total:grandTotal, paidAmount:paid,
       paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate,
-      fromConsignment:true, consignReportIds:reportIds, commissionAmount:grandCommission, commissionPercent,
+      fromConsignment:true, consignReportIds:reportIds, commissionAmount:grandCommission, commissionType, commissionValue,
       multiBranch: branchKeys.length>1,
       createdAt:Date.now(), createdBy:currentUserName()
     };
@@ -6525,19 +6635,29 @@ function onConsignReportPartyChange(){
   wrap.innerHTML = `<p style="font-size:11.5px;color:var(--text-muted);margin:0 0 8px 0;">مفيش فرع محدد، فبنعرضلك أرصدة كل الفروع مع بعض - أي مبيعات تدخلها لأكتر من فرع هتتقسملك تلقائياً لتقارير وفواتير منفصلة بعد الحفظ.</p>` + sections;
   updateConsignReportTotals();
 }
+function onConsignCommissionTypeChange(){
+  const typeEl = document.getElementById('f_commission_type');
+  const valEl = document.getElementById('f_commission');
+  if(typeEl && valEl) valEl.placeholder = typeEl.value==='fixed' ? 'مبلغ لكل قطعة' : 'نسبة %';
+  updateConsignReportTotals();
+}
 function updateConsignReportTotals(){
-  let subtotal = 0;
+  let subtotal = 0, commissionAmount = 0;
+  const defaultType = (document.getElementById('f_commission_type')||{}).value||'percent';
+  const defaultValue = parseFloat((document.getElementById('f_commission')||{}).value)||0;
   document.querySelectorAll('.consign-qty-sold').forEach(inp=>{
     const qty = parseFloat(inp.value)||0;
     const p = productById(inp.dataset.productId);
-    if(p) subtotal += qty*p.salePrice;
+    if(!p) return;
+    const itemTotal = qty*p.salePrice;
+    subtotal += itemTotal;
+    const rate = commissionForItem(p.id, defaultType, defaultValue);
+    commissionAmount += rate.type==='fixed' ? qty*rate.value : itemTotal*rate.value/100;
   });
   const taxEnabled = document.getElementById('f_tax_enabled') ? document.getElementById('f_tax_enabled').checked : false;
   const taxRate = parseFloat((document.getElementById('f_tax_rate')||{}).value)||0;
   const taxAmount = taxEnabled ? subtotal*taxRate/100 : 0;
-  const commissionPercent = parseFloat((document.getElementById('f_commission')||{}).value)||0;
-  const commissionAmount = subtotal*commissionPercent/100;
-  const total = subtotal + taxAmount - commissionAmount;
+  const total = subtotal + taxAmount;
   const set = (id,val)=>{ const el = document.getElementById(id); if(el) el.textContent = val; };
   set('crSubtotal', money(subtotal));
   set('crTax', money(taxAmount));
@@ -7335,6 +7455,7 @@ function reportCashFlow(){
     production:'تكلفة تشغيل/عمالة تصنيع', landedcost:'شحن وتكاليف إضافية',
     tester_handout:'عينات وتسترز', tester_return:'مرتجع عينات وتسترز', purchase_receive:'استلام مشتريات',
     fixed_asset:'شراء أصول ثابتة', fixed_asset_disposal:'بيع/استبعاد أصول ثابتة',
+    consign_commission_payment:'عمولات متاجر الأمانة المدفوعة',
     manual_capital:'إيداعات رأس المال', manual_advance:'دفعات مقدمة من/إلى العملاء والموردين', manual:'حركات يدوية أخرى',
   };
   const categories = {operating:{}, investing:{}, financing:{}};

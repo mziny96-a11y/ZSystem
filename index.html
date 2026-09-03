@@ -6358,8 +6358,9 @@ function openConsignReportModal(){
       <div class="field"><label>المتجر / نقطة البيع *</label><select id="f_party" onchange="onConsignReportPartyChange()">${'<option value="">اختر...</option>'+customersOpts}</select></div>
       <div class="field"><label>الفرع (اختياري)</label><select id="f_branch" onchange="onConsignReportPartyChange()"><option value="">بدون فرع - العنوان الرئيسي</option></select></div>
     </div>
-    <div class="row2">
+    <div class="row3">
       <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>تاريخ الاستحقاق</label><input id="f_duedate" type="date" value="${todayISO()}"></div>
       <div class="field"><label>رقم أمر شراء العميل (PO Number) - اختياري</label><input id="f_po" dir="ltr" style="text-align:left;" placeholder="مثال: PO-2026-0451"></div>
     </div>
     <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px 0;">أدخل الكمية المباعة فعلياً لكل صنف بناءً على تقرير المتجر الدوري. الكمية القصوى = رصيد الأمانة الحالي.</p>
@@ -6387,6 +6388,7 @@ function openConsignReportModal(){
     const partyId = document.getElementById('f_party').value;
     if(!partyId){ toast('اختر المتجر'); return false; }
     const date = document.getElementById('f_date').value || todayISO();
+    const dueDate = document.getElementById('f_duedate') ? (document.getElementById('f_duedate').value || date) : date;
     const poNumber = document.getElementById('f_po') ? document.getElementById('f_po').value.trim() : '';
     const cust = customerById(partyId);
     const qtyInputs = Array.from(document.querySelectorAll('.consign-qty-sold'));
@@ -6447,7 +6449,7 @@ function openConsignReportModal(){
       branchId:null, branchName:branchKeys.length>1?null:(byBranch[branchKeys[0]]&&branchKeys[0]?((cust.branches||[]).find(b=>b.id===branchKeys[0])||{}).name:null), branchAddress:null,
       items:allInvItems, subtotal:grandSubtotal, discountType:'amount', discountValue:0, discountAmount:0,
       taxEnabled, taxRate, taxAmount:grandTax, total:grandTotal, paidAmount:paid,
-      paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate:date,
+      paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate,
       fromConsignment:true, consignReportIds:reportIds, commissionAmount:grandCommission, commissionPercent,
       multiBranch: branchKeys.length>1,
       createdAt:Date.now(), createdBy:currentUserName()

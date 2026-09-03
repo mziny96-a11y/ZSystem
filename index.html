@@ -590,7 +590,7 @@ const ICON = {
 function icon(name){return ICON[name]||'';}
 
 /* ============ STATE ============ */
-let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], productGroups:[], crmActivities:[], purchaseOrders:[], warehouses:[], salesReps:[], custodies:[], custodyEntries:[], boms:[], productionOrders:[], landedCosts:[], comments:[], accounts:[], journal:[], activityLog:[], priceLists:[], fixedAssets:[], settings:{ companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 } };
+let DB = { products:[], customers:[], suppliers:[], sales:[], purchases:[], returns:[], quotations:[], stockMoves:[], consignShipments:[], consignReports:[], testerHandouts:[], expenses:[], productGroups:[], crmActivities:[], purchaseOrders:[], warehouses:[], salesReps:[], custodies:[], custodyEntries:[], boms:[], productionOrders:[], landedCosts:[], comments:[], accounts:[], journal:[], activityLog:[], priceLists:[], fixedAssets:[], commissionPayments:[], settings:{ companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 } };
 let VIEW = 'dashboard';
 
 /* ============ LANGUAGE (عربي / English) ============ */
@@ -1050,7 +1050,7 @@ async function testSupaConnection(url,key){
   return true;
 }
 async function loadAll(){
-  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,fixedAssets,settings] = await Promise.all([
+  const [products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,fixedAssets,commissionPayments,settings] = await Promise.all([
     loadKey('zib_products', []),
     loadKey('zib_customers', []),
     loadKey('zib_suppliers', []),
@@ -1079,9 +1079,10 @@ async function loadAll(){
     loadKey('zib_activity_log', []),
     loadKey('zib_price_lists', []),
     loadKey('zib_fixed_assets', []),
+    loadKey('zib_commission_payments', []),
     loadKey('zib_settings', { companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0 }),
   ]);
-  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,fixedAssets,settings};
+  DB = {products,customers,suppliers,sales,purchases,returns,quotations,stockMoves,consignShipments,consignReports,testerHandouts,expenses,productGroups,crmActivities,purchaseOrders,warehouses,salesReps,custodies,custodyEntries,boms,productionOrders,landedCosts,comments,accounts,journal,activityLog,priceLists,fixedAssets,commissionPayments,settings};
   if(DB.settings.taxRate==null) DB.settings.taxRate = 0;
   if(DB.settings.taxEnabled==null) DB.settings.taxEnabled = false;
   DB_BASELINE = deepClone(DB);
@@ -1135,7 +1136,7 @@ const PERSIST_KEY_MAP = {
   products:'zib_products', customers:'zib_customers', suppliers:'zib_suppliers',
   sales:'zib_sales', purchases:'zib_purchases', returns:'zib_returns', quotations:'zib_quotations', stockMoves:'zib_stock_moves',
   consignShipments:'zib_consign_shipments', consignReports:'zib_consign_reports', testerHandouts:'zib_tester_handouts', expenses:'zib_expenses', productGroups:'zib_product_groups', crmActivities:'zib_crm_activities', purchaseOrders:'zib_purchase_orders', warehouses:'zib_warehouses', salesReps:'zib_sales_reps', custodies:'zib_custodies', custodyEntries:'zib_custody_entries', boms:'zib_boms', productionOrders:'zib_production_orders', landedCosts:'zib_landed_costs', comments:'zib_comments', accounts:'zib_accounts', journal:'zib_journal',
-  activityLog:'zib_activity_log', priceLists:'zib_price_lists', fixedAssets:'zib_fixed_assets', settings:'zib_settings'
+  activityLog:'zib_activity_log', priceLists:'zib_price_lists', fixedAssets:'zib_fixed_assets', commissionPayments:'zib_commission_payments', settings:'zib_settings'
 };
 function persist(part){
   if(!part) return;
@@ -5652,6 +5653,15 @@ function renderConsignDashboard(){
         <tbody>${topProducts.map(([name,qty])=>`<tr><td>${esc(name)}</td><td class="tnum">${fmt(qty)}</td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
+    ${DB.commissionPayments.length>0?`
+    <h3 style="font-size:14.5px;color:var(--primary-dark);margin-top:18px;">آخر سندات دفع عمولات المتاجر</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>رقم السند</th><th>المتجر</th><th>الفرع</th><th>التاريخ</th><th>المبلغ</th><th></th></tr></thead>
+      <tbody>${DB.commissionPayments.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,10).map(v=>`
+        <tr><td>${v.number}</td><td>${esc(v.customerName)}</td><td>${v.branchName?esc(v.branchName):'-'}</td><td>${fmtDate(v.date)}</td><td class="tnum">${money(v.amount)}</td>
+        <td><button class="btn btn-outline btn-icon btn-sm" onclick="printCommissionVoucher('${v.id}')" title="طباعة">${icon('printer')}</button></td></tr>
+      `).join('')}</tbody>
+    </table></div>`:''}
   `;
 }
 function renderConsignmentPage(){
@@ -6363,6 +6373,24 @@ function consignCommissionByBranch(customerId){
   });
   return byBranch;
 }
+function consignCommissionPaidByBranch(customerId){
+  const byBranch = {};
+  DB.commissionPayments.filter(v=>v.customerId===customerId).forEach(v=>{
+    const key = v.branchName || 'بدون فرع';
+    byBranch[key] = (byBranch[key]||0) + (v.amount||0);
+  });
+  return byBranch;
+}
+function consignCommissionOwedByBranch(customerId){
+  const generated = consignCommissionByBranch(customerId);
+  const paid = consignCommissionPaidByBranch(customerId);
+  const owed = {};
+  Object.keys(generated).forEach(branch=>{
+    const rem = generated[branch] - (paid[branch]||0);
+    if(rem>0.009) owed[branch] = rem;
+  });
+  return owed;
+}
 function openCategoryCommissionRatesModal(){
   if(!requirePerm('manage_settings','إدارة معدلات عمولة الفئات')) return;
   const categories = [...new Set(DB.products.map(p=>p.category).filter(c=>c&&c.trim()))].sort();
@@ -6415,45 +6443,100 @@ function openPayConsignCommissionModal(){
   const body = `
     ${storesWithOwed.length===0?`<div class="alert-bar">${icon('alert')}<div>مفيش عمولات مستحقة لأي متجر حالياً.</div></div>`:''}
     <div class="field"><label>المتجر *</label><select id="f_party" onchange="onPayCommissionPartyChange()"><option value="">اختر متجر...</option>${custOpts}</select></div>
-    <p id="commissionOwedNote" style="font-size:12.5px;color:var(--text-muted);margin:6px 0;"></p>
-    <div class="row2" style="margin-top:8px;">
-      <div class="field"><label>المبلغ المدفوع *</label><input id="f_amt" type="number" min="0" step="0.01" value="0"></div>
+    <div id="commissionBranchRows" style="margin-top:10px;"></div>
+    <div class="row2" style="margin-top:10px;">
       <div class="field"><label>التاريخ</label><input id="f_date" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>الخزينة / الحساب البنكي المدفوع منه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
     </div>
-    <div class="field" style="margin-top:10px;"><label>الخزينة / الحساب البنكي المدفوع منه</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
     <div class="field" style="margin-top:10px;"><label>ملاحظات</label><input id="f_memo" placeholder="مثال: عمولة شهر أغسطس"></div>
   `;
   openModal('دفع عمولة متجر', body, ()=>{
     const partyId = document.getElementById('f_party').value;
     if(!partyId){ toast('اختر المتجر'); return false; }
     const cust = customerById(partyId);
-    const owed = consignCommissionOwed(partyId);
-    const amt = parseFloat(document.getElementById('f_amt').value)||0;
-    if(amt<=0){ toast('أدخل مبلغ صحيح'); return false; }
-    if(amt>owed+0.009){ toast('المبلغ أكبر من العمولة المستحقة لهذا المتجر ('+money(owed)+')'); return false; }
+    const owedByBranch = consignCommissionOwedByBranch(partyId);
     const date = document.getElementById('f_date').value || todayISO();
     const cashAcc = document.getElementById('f_cashacc').value;
     const memo = document.getElementById('f_memo').value.trim();
+    const amtInputs = Array.from(document.querySelectorAll('.commission-branch-amt'));
+    const toPay = [];
+    for(const inp of amtInputs){
+      const branchName = inp.dataset.branch;
+      const amt = parseFloat(inp.value)||0;
+      if(amt<=0) continue;
+      const owed = owedByBranch[branchName]||0;
+      if(amt>owed+0.009){ toast('المبلغ المدفوع لـ"'+branchName+'" أكبر من المستحق له ('+money(owed)+')'); return false; }
+      toPay.push({branchName, amt});
+    }
+    if(toPay.length===0){ toast('أدخل مبلغ دفع لفرع واحد على الأقل'); return false; }
     if(!checkPeriodLock(date)) return false;
-    postJournal(date, 'دفع عمولة متجر '+cust.name+(memo?' - '+memo:''), [
-      {accountId:'acc_consign_comm_payable', debit:amt, credit:0, partyType:'customer', partyId, partyName:cust.name},
-      {accountId:cashAcc, debit:0, credit:amt},
-    ], 'consign_commission_payment', uid());
-    logActivity('consignment', 'دفع عمولة متجر '+cust.name+' بمبلغ '+money(amt));
-    closeModal(); render(); toast('تم تسجيل السند بنجاح');
+    const vouchers = [];
+    toPay.forEach(({branchName, amt})=>{
+      const voucher = { id:uid(), number:nextNumber(DB.commissionPayments,'CCV'), date, customerId:partyId, customerName:cust.name, branchName:branchName==='بدون فرع'?null:branchName, amount:amt, cashAccountId:cashAcc, memo, createdAt:Date.now(), createdBy:currentUserName() };
+      DB.commissionPayments.push(voucher);
+      vouchers.push(voucher);
+      postJournal(date, 'دفع عمولة متجر '+cust.name+' - '+branchName+(memo?' - '+memo:''), [
+        {accountId:'acc_consign_comm_payable', debit:amt, credit:0, partyType:'customer', partyId, partyName:cust.name},
+        {accountId:cashAcc, debit:0, credit:amt},
+      ], 'consign_commission_payment', voucher.id);
+      logActivity('consignment', 'دفع عمولة متجر '+cust.name+' - '+branchName+' بمبلغ '+money(amt)+' - سند '+voucher.number);
+    });
+    persist('commissionPayments');
+    closeModal(); render();
+    vouchers.forEach(v=>printCommissionVoucher(v.id));
+    toast(vouchers.length>1?('تم تسجيل '+vouchers.length+' سند منفصل لكل فرع بنجاح'):('تم تسجيل السند رقم '+vouchers[0].number+' بنجاح - وفتحنا نافذة الطباعة لك'));
   });
+}
+function printCommissionVoucher(id){
+  const v = DB.commissionPayments.find(x=>x.id===id);
+  if(!v) return;
+  const companyName = DB.settings.companyName||'Z International Beauty';
+  document.getElementById('printArea').innerHTML = `
+    <div class="inv-print">
+      <div class="doc-top">
+        <div class="doc-logo-block">
+          <div style="display:flex;align-items:center;gap:11px;">
+            ${DB.settings.logo?`<img class="doc-logo-img" src="${DB.settings.logo}">`:`<div class="doc-logo-placeholder">${esc(companyName.charAt(0))}</div>`}
+            <div class="doc-company-name">${esc(companyName)}</div>
+          </div>
+        </div>
+      </div>
+      <h1 class="doc-title">سند دفع عمولة # ${v.number}</h1>
+      <div class="doc-bill-to"><div class="lbl">${dl('المتجر','Store')}</div><div class="nm">${esc(v.customerName)}${v.branchName?' - '+esc(v.branchName):''}</div></div>
+      <div class="doc-meta-row">
+        <div><div class="doc-meta-lbl">${dl('التاريخ','Date')}</div><div class="doc-meta-val">${fmtDate(v.date)}</div></div>
+        ${v.branchName?`<div><div class="doc-meta-lbl">${dl('الفرع','Branch')}</div><div class="doc-meta-val">${esc(v.branchName)}</div></div>`:''}
+        <div><div class="doc-meta-lbl">${dl('المبلغ','Amount')}</div><div class="doc-meta-val" style="font-weight:700;">${money(v.amount)}</div></div>
+      </div>
+      ${v.memo?`<div class="doc-notes">${esc(v.memo)}</div>`:''}
+      <div class="doc-notes" style="display:flex;justify-content:space-between;gap:40px;margin-top:28px;">
+        <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع المستلم','Received By')}</div></div>
+        <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع المُسلِّم','Paid By')}</div></div>
+      </div>
+      <div class="doc-footer"><div class="doc-footer-page">Page 1 of 1</div></div>
+    </div>
+  `;
+  setTimeout(()=>window.print(), 80);
 }
 function onPayCommissionPartyChange(){
   const partyId = document.getElementById('f_party').value;
-  const note = document.getElementById('commissionOwedNote');
-  const amtEl = document.getElementById('f_amt');
-  if(!partyId){ note.innerHTML = ''; return; }
-  const owed = consignCommissionOwed(partyId);
-  const byBranch = consignCommissionByBranch(partyId);
-  const branchLines = Object.entries(byBranch).filter(([,v])=>v>0.009);
-  note.innerHTML = 'العمولة المستحقة لهذا المتجر حالياً: <b>'+money(owed)+'</b>'
-    + (branchLines.length>1 ? '<br><span style="font-size:11.5px;">تفصيل العمولة المتولّدة حسب الفرع (إجمالي تاريخي، بغض النظر عمّا اتدفع): '+branchLines.map(([name,val])=>esc(name)+': '+money(val)).join('، ')+'</span>' : '');
-  if(amtEl) amtEl.value = owed>0 ? owed : 0;
+  const wrap = document.getElementById('commissionBranchRows');
+  if(!partyId){ wrap.innerHTML = ''; return; }
+  const owedByBranch = consignCommissionOwedByBranch(partyId);
+  const branches = Object.entries(owedByBranch);
+  if(branches.length===0){ wrap.innerHTML = `<p style="font-size:12.5px;color:var(--text-muted);">مفيش عمولة مستحقة لهذا المتجر حالياً.</p>`; return; }
+  wrap.innerHTML = `
+    <label>العمولة المستحقة لكل فرع - هيتسجل سند منفصل لأي فرع تدخل له مبلغ</label>
+    <div class="item-rows">
+      <div class="item-row head-row" style="grid-template-columns:1.6fr 1fr 1fr;"><div>الفرع</div><div>المستحق</div><div>المبلغ المدفوع الآن</div></div>
+      ${branches.map(([branchName,owed])=>`
+        <div class="item-row" style="grid-template-columns:1.6fr 1fr 1fr;">
+          <div>${esc(branchName)}</div>
+          <div class="tnum">${money(owed)}</div>
+          <div><input type="number" class="commission-branch-amt" data-branch="${esc(branchName)}" min="0" max="${owed}" step="0.01" value="${owed}"></div>
+        </div>`).join('')}
+    </div>
+  `;
 }
 function openConsignReportModal(){
   if(DB.customers.length===0){ toast('أضف عميل (متجر) أولاً'); return; }
@@ -9046,9 +9129,9 @@ function factoryReset(){
   DB.sales = []; DB.purchases = []; DB.returns = []; DB.quotations = [];
   DB.stockMoves = []; DB.consignShipments = []; DB.consignReports = []; DB.testerHandouts = []; DB.expenses = []; DB.productGroups = []; DB.crmActivities = [];
   DB.purchaseOrders = []; DB.warehouses = [{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = []; DB.custodies = []; DB.custodyEntries = []; DB.boms = []; DB.productionOrders = []; DB.landedCosts = []; DB.comments = [];
-  DB.journal = []; DB.activityLog = []; DB.priceLists = []; DB.fixedAssets = [];
+  DB.journal = []; DB.activityLog = []; DB.priceLists = []; DB.fixedAssets = []; DB.commissionPayments = [];
   DB.accounts = DEFAULT_ACCOUNTS.map(a=>({...a}));
-  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','journal','activityLog','priceLists','fixedAssets','accounts'].forEach(k=>persist(k));
+  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','journal','activityLog','priceLists','fixedAssets','commissionPayments','accounts'].forEach(k=>persist(k));
   logActivity('factory_reset', 'تمت استعادة النظام لوضعه الافتراضي بالكامل بواسطة '+resetBy);
   closeModal(); usersLoaded=false; render();
   toast('تم استعادة النظام لوضعه الافتراضي بنجاح');
@@ -9094,7 +9177,7 @@ async function pickBackupFolder(){
 function buildBackupObject(){
   return {
     products:DB.products, customers:DB.customers, suppliers:DB.suppliers, sales:DB.sales, purchases:DB.purchases,
-    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, productGroups:DB.productGroups, crmActivities:DB.crmActivities, purchaseOrders:DB.purchaseOrders, warehouses:DB.warehouses, salesReps:DB.salesReps, custodies:DB.custodies, custodyEntries:DB.custodyEntries, boms:DB.boms, productionOrders:DB.productionOrders, landedCosts:DB.landedCosts, comments:DB.comments, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, priceLists:DB.priceLists, fixedAssets:DB.fixedAssets, settings:DB.settings,
+    returns:DB.returns, quotations:DB.quotations, stockMoves:DB.stockMoves, consignShipments:DB.consignShipments, consignReports:DB.consignReports, testerHandouts:DB.testerHandouts, expenses:DB.expenses, productGroups:DB.productGroups, crmActivities:DB.crmActivities, purchaseOrders:DB.purchaseOrders, warehouses:DB.warehouses, salesReps:DB.salesReps, custodies:DB.custodies, custodyEntries:DB.custodyEntries, boms:DB.boms, productionOrders:DB.productionOrders, landedCosts:DB.landedCosts, comments:DB.comments, accounts:DB.accounts, journal:DB.journal, activityLog:DB.activityLog, priceLists:DB.priceLists, fixedAssets:DB.fixedAssets, commissionPayments:DB.commissionPayments, settings:DB.settings,
     exportedAt:new Date().toISOString(), version:1
   };
 }
@@ -9269,9 +9352,9 @@ function applyBackupData(data, sourceLabel){
   DB.testerHandouts = data.testerHandouts||[]; DB.expenses = data.expenses||[]; DB.productGroups = data.productGroups||[]; DB.crmActivities = data.crmActivities||[];
   DB.purchaseOrders = data.purchaseOrders||[]; DB.warehouses = data.warehouses||[{id:'wh_main', name:'المخزن الرئيسي', address:''}]; DB.salesReps = data.salesReps||[]; DB.custodies = data.custodies||[]; DB.custodyEntries = data.custodyEntries||[]; DB.boms = data.boms||[]; DB.productionOrders = data.productionOrders||[]; DB.landedCosts = data.landedCosts||[]; DB.comments = data.comments||[];
   DB.accounts = data.accounts||DEFAULT_ACCOUNTS.map(a=>({...a})); DB.journal = data.journal||[];
-  DB.activityLog = data.activityLog||[]; DB.priceLists = data.priceLists||[]; DB.fixedAssets = data.fixedAssets||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0};
+  DB.activityLog = data.activityLog||[]; DB.priceLists = data.priceLists||[]; DB.fixedAssets = data.fixedAssets||[]; DB.commissionPayments = data.commissionPayments||[]; DB.settings = data.settings||{companyName:'Z International Beauty', currency:'QAR', taxEnabled:false, taxRate:0};
   ensureDefaultAccounts();
-  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','accounts','journal','activityLog','priceLists','fixedAssets','settings'].forEach(k=>persist(k));
+  ['products','customers','suppliers','sales','purchases','returns','quotations','stockMoves','consignShipments','consignReports','testerHandouts','expenses','productGroups','crmActivities','purchaseOrders','warehouses','salesReps','custodies','custodyEntries','boms','productionOrders','landedCosts','comments','accounts','journal','activityLog','priceLists','fixedAssets','commissionPayments','settings'].forEach(k=>persist(k));
   logActivity('restore', 'استعادة نسخة احتياطية '+(sourceLabel||'من ملف'));
   closeModal(); usersLoaded=false; render(); toast('تم استعادة النسخة الاحتياطية بنجاح');
 }

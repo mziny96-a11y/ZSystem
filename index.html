@@ -6355,6 +6355,14 @@ function addConsignItemRow(type){
 function consignCommissionOwed(customerId){
   return -partyBalance('customer', customerId, 'acc_consign_comm_payable');
 }
+function consignCommissionByBranch(customerId){
+  const byBranch = {};
+  DB.consignReports.filter(r=>r.customerId===customerId).forEach(r=>{
+    const key = r.branchName || 'بدون فرع';
+    byBranch[key] = (byBranch[key]||0) + (r.commissionAmount||0);
+  });
+  return byBranch;
+}
 function openCategoryCommissionRatesModal(){
   if(!requirePerm('manage_settings','إدارة معدلات عمولة الفئات')) return;
   const categories = [...new Set(DB.products.map(p=>p.category).filter(c=>c&&c.trim()))].sort();
@@ -6439,9 +6447,12 @@ function onPayCommissionPartyChange(){
   const partyId = document.getElementById('f_party').value;
   const note = document.getElementById('commissionOwedNote');
   const amtEl = document.getElementById('f_amt');
-  if(!partyId){ note.textContent = ''; return; }
+  if(!partyId){ note.innerHTML = ''; return; }
   const owed = consignCommissionOwed(partyId);
-  note.textContent = 'العمولة المستحقة لهذا المتجر حالياً: '+money(owed);
+  const byBranch = consignCommissionByBranch(partyId);
+  const branchLines = Object.entries(byBranch).filter(([,v])=>v>0.009);
+  note.innerHTML = 'العمولة المستحقة لهذا المتجر حالياً: <b>'+money(owed)+'</b>'
+    + (branchLines.length>1 ? '<br><span style="font-size:11.5px;">تفصيل العمولة المتولّدة حسب الفرع (إجمالي تاريخي، بغض النظر عمّا اتدفع): '+branchLines.map(([name,val])=>esc(name)+': '+money(val)).join('، ')+'</span>' : '');
   if(amtEl) amtEl.value = owed>0 ? owed : 0;
 }
 function openConsignReportModal(){

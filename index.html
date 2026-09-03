@@ -4042,7 +4042,7 @@ function renderSales(){
               <button class="btn btn-primary btn-sm" onclick="approveSaleInvoice('${s.id}')">${icon('plus')} اعتماد</button>
               <button class="btn btn-danger-o btn-sm" onclick="rejectSaleInvoice('${s.id}')">رفض</button>
               `:''}
-              ${(can('delete_invoices') && !s.fromConsignment)?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteInvoice('sales','${s.id}')">${icon('trash')}</button>`:''}
+              ${can('delete_invoices')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="${s.fromConsignment?`deleteConsignInvoice('${s.id}')`:`deleteInvoice('sales','${s.id}')`}">${icon('trash')}</button>`:''}
             </td>
           </tr>`).join('')}</tbody>
       </table></div>`}
@@ -4905,7 +4905,15 @@ function printInvoice(kind, id){
   const isForeignCur = !isSale && inv.currency && inv.currency!==DB.settings.currency;
   const curLabel = isForeignCur ? inv.currency : DB.settings.currency;
   const itemMoney = (n)=> fmt(n)+' '+curLabel;
-  const rowsHtml = inv.items.map(it=>`
+  const rowsHtml = (()=>{
+    let lastBranch = undefined;
+    return inv.items.map(it=>{
+      let sectionRow = '';
+      if(inv.multiBranch && it.branchName!==lastBranch){
+        lastBranch = it.branchName;
+        sectionRow = `<tr><td colspan="7" style="background:#F7F1E6;font-weight:700;padding:6px 8px;color:#8A5A0A;">${esc(it.branchName)}</td></tr>`;
+      }
+      return sectionRow + `
     <tr>
       <td>${it.code?esc(it.code):'-'}</td>
       <td class="num">${it.barcode?esc(it.barcode):'-'}</td>
@@ -4914,7 +4922,9 @@ function printInvoice(kind, id){
       <td class="num">${fmt(it.price)}</td>
       <td class="num">${inv.taxEnabled?(inv.taxRate||0)+'%':'-'}</td>
       <td class="num" style="font-weight:600;">${itemMoney(it.total)}</td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
+  })();
   const footerParts = [];
   if(DB.settings.website) footerParts.push(esc(DB.settings.website));
   if(DB.settings.phone) footerParts.push(esc(DB.settings.phone));
@@ -5048,7 +5058,7 @@ function deleteInvoice(kind, id){
   const isPending0 = inv0 && (inv0.status||'approved')==='pending';
   if(inv0 && !isPending0 && !checkPeriodLock(inv0.date)) return;
   if(inv0 && inv0.fromConsignment){
-    toast('دي فاتورة ناتجة من تقرير مبيعات أمانة - لا يمكن حذفها مباشرة. استخدم "مرتجع بضاعة أمانة" من صفحة البيع بالأمانة لو محتاج تصحيح.');
+    toast('دي فاتورة بيع أمانة - استخدم زرار الحذف بجانبها في القائمة مباشرة، هيتعامل مع الأمانة والحسابات صح.');
     return;
   }
   const notYetReceived0 = kind==='purchases' && inv0 && !isPending0 && !inv0.received;
@@ -5767,15 +5777,47 @@ function renderConsignReports(){
     </table></div>
   `;
 }
+function deleteConsignInvoice(invId){
+  if(!requirePerm('delete_invoices','حذف فواتير بيع الأمانة')) return;
+  const inv = DB.sales.find(s=>s.id===invId);
+  if(!inv || !inv.fromConsignment) return;
+  if(!checkPeriodLock(inv.date)) return;
+  const reportIds = inv.consignReportIds || [];
+  const isMultiBranch = reportIds.length>1;
+  const branchNames = [...new Set(inv.items.map(it=>it.branchName).filter(Boolean))];
+  const msg = isMultiBranch
+    ? 'الفاتورة دي مجمّعة من '+reportIds.length+' فرع ('+branchNames.join('، ')+') - حذفها هيلغي كل الفروع مع بعض، وكل الكميات هترجع كرصيد أمانة لدى كل فرع. هل أنت متأكد؟'
+    : 'سيتم حذف تقرير مبيعات الأمانة المرتبط وعكس القيد المحاسبي بالكامل (الكمية المباعة هترجع تاني كرصيد أمانة لدى المتجر). هل أنت متأكد؟';
+  confirmAction('حذف فاتورة بيع الأمانة', msg, ()=>{
+    removeJournalBySource(inv.id);
+    DB.consignReports = DB.consignReports.filter(r=>!reportIds.includes(r.id));
+    persist('consignReports');
+    DB.sales = DB.sales.filter(s=>s.id!==invId);
+    persist('sales');
+    logActivity('sale_delete', 'حذف فاتورة بيع أمانة '+inv.number+' - '+inv.partyName+' بقيمة '+money(inv.total));
+    closeModal(); render(); toast('تم الحذف بنجاح');
+  });
+}
 function deleteConsignReport(id){
   if(!requirePerm('delete_invoices','حذف تقارير مبيعات الأمانة')) return;
   const rep = DB.consignReports.find(x=>x.id===id);
   if(!rep) return;
   if(!checkPeriodLock(rep.date)) return;
-  confirmAction('حذف تقرير المبيعات', 'سيتم حذف فاتورة البيع المرتبطة بهذا التقرير وعكس القيد المحاسبي بالكامل (الكمية المباعة هترجع تاني كرصيد أمانة لدى المتجر). هل أنت متأكد؟', ()=>{
-    removeJournalBySource(rep.id);
-    const mirrorInv = DB.sales.find(s=>s.consignReportId===rep.id);
-    if(mirrorInv){ DB.sales = DB.sales.filter(s=>s.id!==mirrorInv.id); persist('sales'); }
+  const mirrorInv = DB.sales.find(s=>(s.consignReportIds||[]).includes(rep.id));
+  const isShared = mirrorInv && (mirrorInv.consignReportIds||[]).length>1;
+  const msg = isShared
+    ? 'التقرير ده جزء من فاتورة واحدة مجمّعة لأكتر من فرع (رقم '+mirrorInv.number+') - حذفه هيحذف الفاتورة كلها وكل فروعها، وترجع كل الكميات كرصيد أمانة. لو محتاج تصحيح فرع واحد بس، سجّل تقرير جديد بعد كده. هل أنت متأكد؟'
+    : 'سيتم حذف فاتورة البيع المرتبطة بهذا التقرير وعكس القيد المحاسبي بالكامل (الكمية المباعة هترجع تاني كرصيد أمانة لدى المتجر). هل أنت متأكد؟';
+  confirmAction('حذف تقرير المبيعات', msg, ()=>{
+    if(mirrorInv){
+      removeJournalBySource(mirrorInv.id);
+      const otherReportIds = (mirrorInv.consignReportIds||[]).filter(rid=>rid!==rep.id);
+      DB.consignReports.filter(r=>otherReportIds.includes(r.id)).forEach(r=>{
+        DB.consignReports = DB.consignReports.filter(x=>x.id!==r.id);
+      });
+      DB.sales = DB.sales.filter(s=>s.id!==mirrorInv.id);
+      persist('sales');
+    }
     DB.consignReports = DB.consignReports.filter(x=>x.id!==id);
     persist('consignReports');
     logActivity('consignment', 'حذف تقرير مبيعات أمانة '+rep.number+' - '+rep.customerName);
@@ -6346,65 +6388,81 @@ function openConsignReportModal(){
     const date = document.getElementById('f_date').value || todayISO();
     const poNumber = document.getElementById('f_po') ? document.getElementById('f_po').value.trim() : '';
     const cust = customerById(partyId);
-    const branchId = document.getElementById('f_branch') ? document.getElementById('f_branch').value : '';
-    const branch = branchId ? (cust.branches||[]).find(b=>b.id===branchId) : null;
     const qtyInputs = Array.from(document.querySelectorAll('.consign-qty-sold'));
-    const items = [];
+    const byBranch = {};
     for(const inp of qtyInputs){
       const qtySold = parseFloat(inp.value)||0;
       if(qtySold<=0) continue;
       const productId = inp.dataset.productId;
+      const branchKey = inp.dataset.branchId || '';
       const p = productById(productId);
-      const held = consignStockFor(partyId, productId, branchId||null);
+      const held = consignStockFor(partyId, productId, branchKey||null);
       if(qtySold>held+0.001){ toast('كمية البيع من "'+p.name+'" أكبر من رصيد الأمانة لديه'); return false; }
-      items.push({productId, name:p.name, code:p.code||'', barcode:p.barcode||'', notes:p.notes||'', qtySold, price:p.salePrice, cost:p.purchasePrice, total:qtySold*p.salePrice});
+      if(!byBranch[branchKey]) byBranch[branchKey] = [];
+      byBranch[branchKey].push({productId, name:p.name, code:p.code||'', barcode:p.barcode||'', notes:p.notes||'', qtySold, price:p.salePrice, cost:p.purchasePrice, total:qtySold*p.salePrice});
     }
-    if(items.length===0){ toast('أدخل كمية مباعة لصنف واحد على الأقل'); return false; }
+    const branchKeys = Object.keys(byBranch);
+    if(branchKeys.length===0){ toast('أدخل كمية مباعة لصنف واحد على الأقل'); return false; }
     if(!checkPeriodLock(date)) return false;
-    const subtotal = items.reduce((s,it)=>s+it.total,0);
     const taxEnabled = document.getElementById('f_tax_enabled').checked;
     const taxRate = parseFloat(document.getElementById('f_tax_rate').value)||0;
-    const taxAmount = taxEnabled ? subtotal*taxRate/100 : 0;
     const commissionPercent = parseFloat(document.getElementById('f_commission').value)||0;
-    const commissionAmount = subtotal*commissionPercent/100;
-    const total = subtotal + taxAmount - commissionAmount;
-    const paid = Math.min(parseFloat(document.getElementById('f_paid').value)||0, total);
     const cashAcc = document.getElementById('f_cashacc').value;
-    const cost = items.reduce((s,it)=>s+it.qtySold*(it.cost||0),0);
-    const rep = { id:uid(), number:nextNumber(DB.consignReports,'CSR'), date, customerId:partyId, customerName:cust.name, branchId:branchId||null, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null, poNumber, items, subtotal, taxEnabled, taxRate, taxAmount, commissionPercent, commissionAmount, total, paidAmount:paid, createdAt:Date.now(), createdBy:currentUserName() };
-    DB.consignReports.push(rep);
-    items.forEach(it=>{ logStockMove(it.productId, -it.qtySold, 'consign_sold', rep.number, 'مبيعات أمانة - '+cust.name); });
+    const paidTotal = parseFloat(document.getElementById('f_paid').value)||0;
+    const reportIds = [];
+    const allInvItems = [];
+    let grandSubtotal = 0, grandTax = 0, grandCommission = 0, grandCost = 0;
+    branchKeys.forEach(branchKey=>{
+      const items = byBranch[branchKey];
+      const branchId = branchKey || null;
+      const branch = branchId ? (cust.branches||[]).find(b=>b.id===branchId) : null;
+      const subtotal = items.reduce((s,it)=>s+it.total,0);
+      const taxAmount = taxEnabled ? subtotal*taxRate/100 : 0;
+      const commissionAmount = subtotal*commissionPercent/100;
+      const total = subtotal + taxAmount - commissionAmount;
+      const cost = items.reduce((s,it)=>s+it.qtySold*(it.cost||0),0);
+      const rep = { id:uid(), number:nextNumber(DB.consignReports,'CSR'), date, customerId:partyId, customerName:cust.name, branchId, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null, poNumber, items, subtotal, taxEnabled, taxRate, taxAmount, commissionPercent, commissionAmount, total, paidAmount:0, createdAt:Date.now(), createdBy:currentUserName() };
+      DB.consignReports.push(rep);
+      reportIds.push(rep.id);
+      items.forEach(it=>{ logStockMove(it.productId, -it.qtySold, 'consign_sold', rep.number, 'مبيعات أمانة - '+cust.name+(branch?' - '+branch.name:'')); });
+      logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+(branch?' - '+branch.name:'')+' بقيمة '+money(total));
+      items.forEach(it=>{
+        allInvItems.push({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', notes:it.notes||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة', branchName:branch?branch.name:'بدون فرع'});
+      });
+      grandSubtotal += subtotal; grandTax += taxAmount; grandCommission += commissionAmount; grandCost += cost;
+    });
+    const grandTotal = grandSubtotal + grandTax - grandCommission;
+    const paid = Math.min(paidTotal, grandTotal);
     persist('consignReports');
     const lines = [
-      {accountId:'acc_ar', debit:total, credit:0, partyType:'customer', partyId, partyName:cust.name},
-      {accountId:'acc_sales', debit:0, credit:subtotal},
+      {accountId:'acc_ar', debit:grandTotal, credit:0, partyType:'customer', partyId, partyName:cust.name},
+      {accountId:'acc_sales', debit:0, credit:grandSubtotal},
     ];
-    if(taxAmount>0) lines.push({accountId:'acc_vat_out', debit:0, credit:taxAmount});
-    if(commissionAmount>0) lines.push({accountId:'acc_consign_comm', debit:commissionAmount, credit:0});
-    if(cost>0){ lines.push({accountId:'acc_cogs', debit:cost, credit:0}); lines.push({accountId:'acc_consign_inv', debit:0, credit:cost}); }
-    postJournal(date, 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name, lines, 'consign_report', rep.id);
-    if(paid>0){
-      postJournal(date, 'تحصيل عند تقرير أمانة '+rep.number, [
-        {accountId:cashAcc, debit:paid, credit:0},
-        {accountId:'acc_ar', debit:0, credit:paid, partyType:'customer', partyId, partyName:cust.name},
-      ], 'consign_report', rep.id);
-    }
-    logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+' بقيمة '+money(total));
-    const invItems = items.map(it=>({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', notes:it.notes||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة'}));
+    if(grandTax>0) lines.push({accountId:'acc_vat_out', debit:0, credit:grandTax});
+    if(grandCommission>0) lines.push({accountId:'acc_consign_comm', debit:grandCommission, credit:0});
+    if(grandCost>0){ lines.push({accountId:'acc_cogs', debit:grandCost, credit:0}); lines.push({accountId:'acc_consign_inv', debit:0, credit:grandCost}); }
     const mirrorInv = {
       id:uid(), number:nextInvoiceNo(), date, partyId, partyName:cust.name, poNumber,
-      branchId:branchId||null, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null,
-      items:invItems, subtotal, discountType:'amount', discountValue:0, discountAmount:0,
-      taxEnabled, taxRate, taxAmount, total, paidAmount:paid,
+      branchId:null, branchName:branchKeys.length>1?null:(byBranch[branchKeys[0]]&&branchKeys[0]?((cust.branches||[]).find(b=>b.id===branchKeys[0])||{}).name:null), branchAddress:null,
+      items:allInvItems, subtotal:grandSubtotal, discountType:'amount', discountValue:0, discountAmount:0,
+      taxEnabled, taxRate, taxAmount:grandTax, total:grandTotal, paidAmount:paid,
       paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate:date,
-      fromConsignment:true, consignReportId:rep.id, commissionAmount, commissionPercent,
+      fromConsignment:true, consignReportIds:reportIds, commissionAmount:grandCommission, commissionPercent,
+      multiBranch: branchKeys.length>1,
       createdAt:Date.now(), createdBy:currentUserName()
     };
     DB.sales.push(mirrorInv);
     persist('sales');
+    postJournal(date, 'فاتورة بيع أمانة '+mirrorInv.number+' - '+cust.name, lines, 'consign_report', mirrorInv.id, 'invoice_main');
+    if(paid>0){
+      postJournal(date, 'تحصيل عند فاتورة أمانة '+mirrorInv.number, [
+        {accountId:cashAcc, debit:paid, credit:0},
+        {accountId:'acc_ar', debit:0, credit:paid, partyType:'customer', partyId, partyName:cust.name},
+      ], 'consign_report', mirrorInv.id, 'payment');
+    }
     closeModal(); goTo('sales');
     printInvoice('sales', mirrorInv.id);
-    toast('تم تسجيل التقرير وإصدار فاتورة بيع رقم '+mirrorInv.number+' - وفتحنا نافذة الطباعة لك');
+    toast(branchKeys.length>1?('تم تسجيل مبيعات '+branchKeys.length+' فرع في فاتورة واحدة رقم '+mirrorInv.number+' موضّح فيها كل فرع - وفتحنا نافذة الطباعة لك'):('تم تسجيل التقرير وإصدار فاتورة بيع رقم '+mirrorInv.number+' - وفتحنا نافذة الطباعة لك'));
   });
 }
 function onConsignReportPartyChange(){
@@ -6416,25 +6474,52 @@ function onConsignReportPartyChange(){
     const cust = partyId ? customerById(partyId) : null;
     const branches = (cust && cust.branches) || [];
     const isSameParty = branchSel.dataset.forParty===partyId;
-    branchSel.innerHTML = '<option value="">بدون فرع - العنوان الرئيسي</option>' + branches.map(b=>`<option value="${b.id}" ${isSameParty&&b.id===currentBranchVal?'selected':''}>${esc(b.name)}</option>`).join('');
+    branchSel.innerHTML = '<option value="">بدون فرع - كل الفروع مع بعض</option>' + branches.map(b=>`<option value="${b.id}" ${isSameParty&&b.id===currentBranchVal?'selected':''}>${esc(b.name)}</option>`).join('');
     branchSel.dataset.forParty = partyId;
   }
   if(!partyId){ wrap.innerHTML = `<p style="font-size:12.5px;color:var(--text-muted);">اختر المتجر أولاً لعرض أصناف الأمانة لديه.</p>`; return; }
   const branchId = branchSel ? (branchSel.value||null) : null;
-  const map = consignStockMap(partyId, branchId);
-  const rows = Object.keys(map).map(pid=>{ const p = productById(pid); return {p, held:map[pid]}; }).filter(r=>r.p && r.held>0.001);
-  if(rows.length===0){ wrap.innerHTML = `<p style="font-size:12.5px;color:var(--text-muted);">لا توجد بضاعة أمانة لدى هذا ${branchId?'الفرع':'المتجر'} حالياً.</p>`; return; }
-  wrap.innerHTML = `
-    <div class="item-rows">
-      <div class="item-row head-row" style="grid-template-columns:2fr 1fr 1fr;"><div>المنتج</div><div>الرصيد لديه</div><div>الكمية المباعة</div></div>
-      ${rows.map(r=>`
-        <div class="item-row" style="grid-template-columns:2fr 1fr 1fr;">
-          <div>${esc(r.p.name)}</div>
-          <div class="tnum">${fmt(r.held)}</div>
-          <div><input type="number" class="consign-qty-sold" data-product-id="${r.p.id}" min="0" max="${r.held}" step="1" value="0" oninput="updateConsignReportTotals()"></div>
-        </div>`).join('')}
-    </div>
-  `;
+  const cust = customerById(partyId);
+  const branches = (cust && cust.branches) || [];
+  if(branchId || branches.length===0){
+    const map = consignStockMap(partyId, branchId);
+    const rows = Object.keys(map).map(pid=>{ const p = productById(pid); return {p, held:map[pid]}; }).filter(r=>r.p && r.held>0.001);
+    if(rows.length===0){ wrap.innerHTML = `<p style="font-size:12.5px;color:var(--text-muted);">لا توجد بضاعة أمانة لدى هذا ${branchId?'الفرع':'المتجر'} حالياً.</p>`; return; }
+    wrap.innerHTML = `
+      <div class="item-rows">
+        <div class="item-row head-row" style="grid-template-columns:2fr 1fr 1fr;"><div>المنتج</div><div>الرصيد لديه</div><div>الكمية المباعة</div></div>
+        ${rows.map(r=>`
+          <div class="item-row" style="grid-template-columns:2fr 1fr 1fr;">
+            <div>${esc(r.p.name)}</div>
+            <div class="tnum">${fmt(r.held)}</div>
+            <div><input type="number" class="consign-qty-sold" data-product-id="${r.p.id}" data-branch-id="${branchId||''}" min="0" max="${r.held}" step="1" value="0" oninput="updateConsignReportTotals()"></div>
+          </div>`).join('')}
+      </div>
+    `;
+    updateConsignReportTotals();
+    return;
+  }
+  const buckets = [{id:null, name:'بدون فرع - العنوان الرئيسي'}, ...branches.map(b=>({id:b.id, name:b.name}))];
+  const sections = buckets.map(bucket=>{
+    const map = consignStockMap(partyId, bucket.id);
+    const rows = Object.keys(map).map(pid=>{ const p = productById(pid); return {p, held:map[pid]}; }).filter(r=>r.p && r.held>0.001);
+    if(rows.length===0) return '';
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700;font-size:13px;color:var(--gold);margin-bottom:6px;">${esc(bucket.name)}</div>
+        <div class="item-rows">
+          <div class="item-row head-row" style="grid-template-columns:2fr 1fr 1fr;"><div>المنتج</div><div>الرصيد لديه</div><div>الكمية المباعة</div></div>
+          ${rows.map(r=>`
+            <div class="item-row" style="grid-template-columns:2fr 1fr 1fr;">
+              <div>${esc(r.p.name)}</div>
+              <div class="tnum">${fmt(r.held)}</div>
+              <div><input type="number" class="consign-qty-sold" data-product-id="${r.p.id}" data-branch-id="${bucket.id||''}" min="0" max="${r.held}" step="1" value="0" oninput="updateConsignReportTotals()"></div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+  if(!sections.trim()){ wrap.innerHTML = `<p style="font-size:12.5px;color:var(--text-muted);">لا توجد بضاعة أمانة لدى هذا المتجر حالياً في أي فرع.</p>`; return; }
+  wrap.innerHTML = `<p style="font-size:11.5px;color:var(--text-muted);margin:0 0 8px 0;">مفيش فرع محدد، فبنعرضلك أرصدة كل الفروع مع بعض - أي مبيعات تدخلها لأكتر من فرع هتتقسملك تلقائياً لتقارير وفواتير منفصلة بعد الحفظ.</p>` + sections;
   updateConsignReportTotals();
 }
 function updateConsignReportTotals(){

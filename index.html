@@ -701,6 +701,7 @@ const DEFAULT_ACCOUNTS = [
   {id:'acc_inv_adj', code:'5200', name:'فروقات جرد المخزون', type:'expense'},
   {id:'acc_consign_inv', code:'1250', name:'بضاعة أمانة لدى الغير', type:'asset'},
   {id:'acc_consign_comm', code:'5300', name:'عمولات بيع بالأمانة', type:'expense'},
+  {id:'acc_consign_deduction', code:'5310', name:'خصم كونسيمنت للمتاجر', type:'expense'},
   {id:'acc_consign_comm_payable', code:'2150', name:'عمولات متاجر الأمانة المستحقة الدفع', type:'liability'},
   {id:'acc_samples', code:'5400', name:'عينات وتسترز مجانية (تسويق)', type:'expense'},
   {id:'acc_scrap', code:'5500', name:'هالك وتوالف التصنيع', type:'expense'},
@@ -4946,7 +4947,7 @@ function printInvoice(kind, id){
     bill_to_block: `<div class="doc-bill-to"><div class="lbl">${dl(isSale?'إلى':'المورد', isSale?'Bill To':'Supplier')}</div><div class="nm">${esc(inv.partyName)}</div>${party&&party.address?`<div class="ln">${esc(party.address)}</div>`:''}${party&&party.phone?`<div class="ln">${esc(party.phone)}</div>`:''}${inv.branchName?`<div class="ln" style="margin-top:8px;font-weight:700;color:#1a1a1a;">${esc(inv.branchName)}</div>${inv.branchAddress?`<div class="ln">${esc(inv.branchAddress)}</div>`:''}`:''}</div>`,
     meta_row: `${(DB.settings.warehouse && !inv.fromConsignment)?`<div style="margin-bottom:8px;"><div class="doc-meta-lbl">${dl('المخزن','Location')}</div><div class="doc-meta-val">${esc(DB.settings.warehouse)}</div></div>`:''}<div class="doc-meta-row"><div><div class="doc-meta-lbl">${dl('التاريخ','Date')}</div><div class="doc-meta-val">${fmtDate(inv.date)}</div></div>${inv.poNumber?`<div><div class="doc-meta-lbl" style="color:#B8862E;">${dl('رقم أمر شراء العميل','Customer PO No.')}</div><div class="doc-meta-val" style="font-weight:700;color:#1a1a1a;">${esc(inv.poNumber)}</div></div>`:''}<div><div class="doc-meta-lbl">${dl('الاستحقاق','Due Date')}</div><div class="doc-meta-val">${inv.dueDate?fmtDate(inv.dueDate):'-'}</div></div><div><div class="doc-meta-lbl">${dl('الحالة','Status')}</div><div class="doc-meta-val">${statusEn}</div></div>${isForeignCur?`<div><div class="doc-meta-lbl">${dl('العملة','Currency')}</div><div class="doc-meta-val">${esc(inv.currency)} (${dl('سعر الصرف','Rate')} ${inv.exchangeRate})</div></div>`:''}</div>`,
     items_table: `<table class="doc-table cells-left"><thead><tr><th>${dl('كود الصنف','Item Code')}</th><th class="num">${dl('الباركود','Barcode')}</th><th>${dl('الوصف','Description')}</th><th class="num">${dl('الكمية','Qty')}</th><th class="num">${dl('السعر','Price')}</th><th class="num">${dl('الضريبة','Tax')}</th><th class="num">${dl('الإجمالي','Amount')}</th></tr></thead><tbody>${rowsHtml}</tbody></table>`,
-    totals_block: `<div class="doc-totals-wrap"><div class="doc-totals">${dispDiscount>0.009?`<div class="doc-totals-row"><span>${dl('الإجمالي الفرعي','Subtotal')}</span><span class="val">${itemMoney(dispSubtotal)}</span></div><div class="doc-totals-row"><span>${dl('الخصم','Discount')}</span><span class="val">-${itemMoney(dispDiscount)}</span></div>`:''}<div class="doc-totals-row"><span>${dl('الإجمالي غير الخاضع للضريبة','Untaxed Amount')}</span><span class="val">${itemMoney(dispSubtotal-dispDiscount)}</span></div>${dispTax>0.009?`<div class="doc-totals-row"><span>${dl('الضريبة '+(inv.taxRate||0)+'%','Tax '+(inv.taxRate||0)+'%')}</span><span class="val">${itemMoney(dispTax)}</span></div>`:''}<div class="doc-totals-row grand"><span>${dl('الإجمالي','Total')}</span><span class="val">${itemMoney(dispTotal)}</span></div>${isForeignCur?`<div class="doc-totals-row" style="font-size:11px;color:#777;"><span>${dl('يعادل تقريباً','Approx. equivalent')}</span><span class="val">${money(inv.total)}</span></div>`:''}</div></div>`,
+    totals_block: `<div class="doc-totals-wrap"><div class="doc-totals">${dispDiscount>0.009?`<div class="doc-totals-row"><span>${dl('الإجمالي الفرعي','Subtotal')}</span><span class="val">${itemMoney(dispSubtotal)}</span></div><div class="doc-totals-row"><span>${dl('الخصم','Discount')}</span><span class="val">-${itemMoney(dispDiscount)}</span></div>`:''}<div class="doc-totals-row"><span>${dl('الإجمالي غير الخاضع للضريبة','Untaxed Amount')}</span><span class="val">${itemMoney(dispSubtotal-dispDiscount)}</span></div>${dispTax>0.009?`<div class="doc-totals-row"><span>${dl('الضريبة '+(inv.taxRate||0)+'%','Tax '+(inv.taxRate||0)+'%')}</span><span class="val">${itemMoney(dispTax)}</span></div>`:''}<div class="doc-totals-row grand"><span>${dl('الإجمالي','Total')}</span><span class="val">${itemMoney(dispTotal)}</span></div>${isForeignCur?`<div class="doc-totals-row" style="font-size:11px;color:#777;"><span>${dl('يعادل تقريباً','Approx. equivalent')}</span><span class="val">${money(inv.total)}</span></div>`:''}${(inv.fromConsignment && inv.commissionAmount>0.009)?`<div class="doc-totals-row" style="color:#8A5A0A;font-size:11px;"><span>${dl('عمولة موظفي/بائعي المتجر (منفصلة، تُدفع بسند لاحقاً)','Store Staff Commission (paid separately)')}</span><span class="val">${itemMoney(inv.commissionAmount)}</span></div>`:''}</div></div>`,
     notes_block: `<div class="doc-notes">${(inv.termLabel && !inv.fromConsignment)?`<div><b>${dl('شروط الدفع','Payment Terms')}:</b> ${esc(inv.termLabel)}</div>`:''}${due>0.009?`<div><b>${dl('المتبقي','Balance Due')}:</b> ${itemMoney(dispDue)}</div>`:''}</div>`,
     footer_block: `<div class="doc-footer"><div>${footerParts.join(' • ')}</div><div class="doc-footer-page">Page 1 of 1</div></div>`,
   };
@@ -5654,7 +5655,7 @@ function renderConsignDashboard(){
       </div>
     </div>
     ${DB.commissionPayments.length>0?`
-    <h3 style="font-size:14.5px;color:var(--primary-dark);margin-top:18px;">آخر سندات دفع عمولات المتاجر</h3>
+    <h3 style="font-size:14.5px;color:var(--primary-dark);margin-top:18px;">آخر سندات دفع عمولات سيلز المتاجر</h3>
     <div class="table-wrap"><table>
       <thead><tr><th>رقم السند</th><th>المتجر</th><th>الفرع</th><th>التاريخ</th><th>المبلغ</th><th></th></tr></thead>
       <tbody>${DB.commissionPayments.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,10).map(v=>`
@@ -5696,7 +5697,7 @@ function renderConsignmentPage(){
           <button class="btn btn-outline" onclick="openTesterModal()">${icon('duplicate')} توزيع عينات / تسترز</button>
           <button class="btn btn-outline" onclick="openConsignShipmentModal('return')">${icon('undo')} مرتجع بضاعة أمانة</button>
           <button class="btn btn-outline" onclick="openConsignReportModal()">${icon('statement')} تسجيل تقرير مبيعات</button>
-          <button class="btn btn-outline" onclick="openPayConsignCommissionModal()">${icon('money')} دفع عمولة متجر</button>
+          <button class="btn btn-outline" onclick="openPayConsignCommissionModal()">${icon('money')} دفع عمولة سيلز المتجر</button>
           <button class="btn btn-outline" onclick="openCategoryCommissionRatesModal()">${icon('edit')} معدلات عمولة الفئات</button>
           <button class="btn btn-primary" onclick="openConsignShipmentModal('out')">${icon('plus')} إذن صرف بضاعة أمانة</button>
         </div>
@@ -6437,7 +6438,7 @@ function commissionForItem(productId, defaultType, defaultValue){
   return {type:defaultType, value:defaultValue};
 }
 function openPayConsignCommissionModal(){
-  if(!requirePerm('manage_accounts','دفع عمولة متجر')) return;
+  if(!requirePerm('manage_accounts','دفع عمولة سيلز المتجر')) return;
   const storesWithOwed = DB.customers.filter(c=>consignCommissionOwed(c.id)>0.009);
   const custOpts = DB.customers.map(c=>`<option value="${c.id}">${esc(c.name)}${consignCommissionOwed(c.id)>0.009?' (مستحق '+money(consignCommissionOwed(c.id))+')':''}</option>`).join('');
   const body = `
@@ -6450,7 +6451,7 @@ function openPayConsignCommissionModal(){
     </div>
     <div class="field" style="margin-top:10px;"><label>ملاحظات</label><input id="f_memo" placeholder="مثال: عمولة شهر أغسطس"></div>
   `;
-  openModal('دفع عمولة متجر', body, ()=>{
+  openModal('دفع عمولة سيلز المتجر', body, ()=>{
     const partyId = document.getElementById('f_party').value;
     if(!partyId){ toast('اختر المتجر'); return false; }
     const cust = customerById(partyId);
@@ -6475,11 +6476,11 @@ function openPayConsignCommissionModal(){
       const voucher = { id:uid(), number:nextNumber(DB.commissionPayments,'CCV'), date, customerId:partyId, customerName:cust.name, branchName:branchName==='بدون فرع'?null:branchName, amount:amt, cashAccountId:cashAcc, memo, createdAt:Date.now(), createdBy:currentUserName() };
       DB.commissionPayments.push(voucher);
       vouchers.push(voucher);
-      postJournal(date, 'دفع عمولة متجر '+cust.name+' - '+branchName+(memo?' - '+memo:''), [
+      postJournal(date, 'دفع عمولة سيلز متجر '+cust.name+' - '+branchName+(memo?' - '+memo:''), [
         {accountId:'acc_consign_comm_payable', debit:amt, credit:0, partyType:'customer', partyId, partyName:cust.name},
         {accountId:cashAcc, debit:0, credit:amt},
       ], 'consign_commission_payment', voucher.id);
-      logActivity('consignment', 'دفع عمولة متجر '+cust.name+' - '+branchName+' بمبلغ '+money(amt)+' - سند '+voucher.number);
+      logActivity('consignment', 'دفع عمولة سيلز متجر '+cust.name+' - '+branchName+' بمبلغ '+money(amt)+' - سند '+voucher.number);
     });
     persist('commissionPayments');
     closeModal(); render();
@@ -6501,7 +6502,7 @@ function printCommissionVoucher(id){
           </div>
         </div>
       </div>
-      <h1 class="doc-title">سند دفع عمولة # ${v.number}</h1>
+      <h1 class="doc-title">سند دفع عمولة سيلز # ${v.number}</h1>
       <div class="doc-bill-to"><div class="lbl">${dl('المتجر','Store')}</div><div class="nm">${esc(v.customerName)}${v.branchName?' - '+esc(v.branchName):''}</div></div>
       <div class="doc-meta-row">
         <div><div class="doc-meta-lbl">${dl('التاريخ','Date')}</div><div class="doc-meta-val">${fmtDate(v.date)}</div></div>
@@ -6555,15 +6556,7 @@ function openConsignReportModal(){
     <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px 0;">أدخل الكمية المباعة فعلياً لكل صنف بناءً على تقرير المتجر الدوري. الكمية القصوى = رصيد الأمانة الحالي.</p>
     <div id="consignReportItems"><p style="font-size:12.5px;color:var(--text-muted);">اختر المتجر أولاً لعرض أصناف الأمانة لديه.</p></div>
     <div class="row3" style="margin-top:14px;">
-      <div class="field"><label>نوع عمولة المتجر (الافتراضي - قابل للتخصيص حسب الفئة)</label>
-        <div style="display:flex;gap:6px;">
-          <select id="f_commission_type" onchange="onConsignCommissionTypeChange()" style="flex:1;">
-            <option value="percent">نسبة % من المبيعات</option>
-            <option value="fixed">مبلغ ثابت لكل قطعة</option>
-          </select>
-          <input id="f_commission" type="number" step="0.01" value="0" oninput="updateConsignReportTotals()" style="flex:1;" placeholder="النسبة أو المبلغ">
-        </div>
-      </div>
+      <div class="field"><label>نسبة الكونسيمنت % (بتتخصم من إجمالي الفاتورة مباشرة)</label><input id="f_consignment_pct" type="number" step="0.01" value="0" oninput="updateConsignReportTotals()"></div>
       <div class="field"><label>نسبة الضريبة %</label><input id="f_tax_rate" type="number" step="0.01" value="${dTax}" oninput="updateConsignReportTotals()"></div>
       <div class="field" style="display:flex;align-items:flex-end;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:9px;">
@@ -6572,11 +6565,23 @@ function openConsignReportModal(){
         </label>
       </div>
     </div>
+    <div class="row3" style="margin-top:14px;">
+      <div class="field"><label>عمولة موظفي/بائعي المتجر (منفصلة - هتتدفع بسند لاحقاً، مش بتتخصم من الفاتورة)</label>
+        <div style="display:flex;gap:6px;">
+          <select id="f_commission_type" onchange="onConsignCommissionTypeChange()" style="flex:1;">
+            <option value="percent">نسبة % من المبيعات</option>
+            <option value="fixed">مبلغ ثابت لكل قطعة</option>
+          </select>
+          <input id="f_commission" type="number" step="0.01" value="0" oninput="updateConsignReportTotals()" style="flex:1;" placeholder="النسبة أو المبلغ">
+        </div>
+      </div>
+    </div>
     <div style="margin-top:8px;">
       <div class="tot-line"><span>إجمالي المبيعات</span><span class="tnum" id="crSubtotal">${money(0)}</span></div>
+      <div class="tot-line"><span>نسبة الكونسيمنت (خصم من الفاتورة)</span><span class="tnum" id="crConsignmentDeduction">-${money(0)}</span></div>
       <div class="tot-line"><span>الضريبة</span><span class="tnum" id="crTax">${money(0)}</span></div>
-      <div class="tot-line"><span>عمولة مستحقة للمتجر (منفصلة، هتتسجل كسند دفع لاحقاً)</span><span class="tnum" id="crCommission">${money(0)}</span></div>
-      <div class="tot-line grand"><span>إجمالي المستحق من المتجر (قيمة البيع)</span><span class="tnum" id="crTotal">${money(0)}</span></div>
+      <div class="tot-line grand"><span>إجمالي المستحق من المتجر (بعد خصم الكونسيمنت)</span><span class="tnum" id="crTotal">${money(0)}</span></div>
+      <div class="tot-line" style="margin-top:6px;color:var(--text-muted);"><span>عمولة موظفي/بائعي المتجر (منفصلة تماماً، هتتسجل كسند دفع لاحقاً - مش جزء من المستحق أعلاه)</span><span class="tnum" id="crCommission">${money(0)}</span></div>
       <div class="field" style="margin-top:8px;"><label>الخزينة / الحساب البنكي عند التحصيل الآن</label><select id="f_cashacc">${cashBankOptionsHtml()}</select></div>
       <div class="field"><label>المبلغ المُحصَّل الآن (اختياري)</label><input id="f_paid" type="number" step="0.01" value="0"></div>
     </div>
@@ -6606,42 +6611,46 @@ function openConsignReportModal(){
     if(!checkPeriodLock(date)) return false;
     const taxEnabled = document.getElementById('f_tax_enabled').checked;
     const taxRate = parseFloat(document.getElementById('f_tax_rate').value)||0;
+    const consignmentPct = parseFloat(document.getElementById('f_consignment_pct').value)||0;
     const commissionType = document.getElementById('f_commission_type').value||'percent';
     const commissionValue = parseFloat(document.getElementById('f_commission').value)||0;
     const cashAcc = document.getElementById('f_cashacc').value;
     const paidTotal = parseFloat(document.getElementById('f_paid').value)||0;
     const reportIds = [];
     const allInvItems = [];
-    let grandSubtotal = 0, grandTax = 0, grandCommission = 0, grandCost = 0;
+    let grandSubtotal = 0, grandDeduction = 0, grandTax = 0, grandCommission = 0, grandCost = 0;
     branchKeys.forEach(branchKey=>{
       const items = byBranch[branchKey];
       const branchId = branchKey || null;
       const branch = branchId ? (cust.branches||[]).find(b=>b.id===branchId) : null;
       const subtotal = items.reduce((s,it)=>s+it.total,0);
-      const taxAmount = taxEnabled ? subtotal*taxRate/100 : 0;
+      const consignmentDeduction = subtotal*consignmentPct/100;
+      const netSubtotal = subtotal - consignmentDeduction;
+      const taxAmount = taxEnabled ? netSubtotal*taxRate/100 : 0;
       const commissionAmount = items.reduce((s,it)=>{
         const rate = commissionForItem(it.productId, commissionType, commissionValue);
         return s + (rate.type==='fixed' ? it.qtySold*rate.value : it.total*rate.value/100);
       },0);
-      const total = subtotal + taxAmount;
+      const total = netSubtotal + taxAmount;
       const cost = items.reduce((s,it)=>s+it.qtySold*(it.cost||0),0);
-      const rep = { id:uid(), number:nextNumber(DB.consignReports,'CSR'), date, customerId:partyId, customerName:cust.name, branchId, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null, poNumber, items, subtotal, taxEnabled, taxRate, taxAmount, commissionType, commissionValue, commissionAmount, total, paidAmount:0, createdAt:Date.now(), createdBy:currentUserName() };
+      const rep = { id:uid(), number:nextNumber(DB.consignReports,'CSR'), date, customerId:partyId, customerName:cust.name, branchId, branchName:branch?branch.name:null, branchAddress:branch?branch.address:null, poNumber, items, subtotal, consignmentPct, consignmentDeduction, taxEnabled, taxRate, taxAmount, commissionType, commissionValue, commissionAmount, total, paidAmount:0, createdAt:Date.now(), createdBy:currentUserName() };
       DB.consignReports.push(rep);
       reportIds.push(rep.id);
       items.forEach(it=>{ logStockMove(it.productId, -it.qtySold, 'consign_sold', rep.number, 'مبيعات أمانة - '+cust.name+(branch?' - '+branch.name:'')); });
-      logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+(branch?' - '+branch.name:'')+' بقيمة '+money(total)+(commissionAmount>0?' (عمولة مستحقة '+money(commissionAmount)+')':''));
+      logActivity('consignment', 'تقرير مبيعات أمانة '+rep.number+' - '+cust.name+(branch?' - '+branch.name:'')+' بقيمة '+money(total)+(commissionAmount>0?' (عمولة سيلز مستحقة '+money(commissionAmount)+')':''));
       items.forEach(it=>{
         allInvItems.push({productId:it.productId, name:it.name, code:it.code, barcode:it.barcode||'', notes:it.notes||'', qty:it.qtySold, price:it.price, cost:it.cost, total:it.total, unit:'قطعة', branchName:branch?branch.name:'بدون فرع'});
       });
-      grandSubtotal += subtotal; grandTax += taxAmount; grandCommission += commissionAmount; grandCost += cost;
+      grandSubtotal += subtotal; grandDeduction += consignmentDeduction; grandTax += taxAmount; grandCommission += commissionAmount; grandCost += cost;
     });
-    const grandTotal = grandSubtotal + grandTax;
+    const grandTotal = (grandSubtotal-grandDeduction) + grandTax;
     const paid = Math.min(paidTotal, grandTotal);
     persist('consignReports');
     const lines = [
       {accountId:'acc_ar', debit:grandTotal, credit:0, partyType:'customer', partyId, partyName:cust.name},
       {accountId:'acc_sales', debit:0, credit:grandSubtotal},
     ];
+    if(grandDeduction>0) lines.push({accountId:'acc_consign_deduction', debit:grandDeduction, credit:0});
     if(grandTax>0) lines.push({accountId:'acc_vat_out', debit:0, credit:grandTax});
     if(grandCost>0){ lines.push({accountId:'acc_cogs', debit:grandCost, credit:0}); lines.push({accountId:'acc_consign_inv', debit:0, credit:grandCost}); }
     if(grandCommission>0){
@@ -6651,7 +6660,7 @@ function openConsignReportModal(){
     const mirrorInv = {
       id:uid(), number:nextInvoiceNo(), date, partyId, partyName:cust.name, poNumber,
       branchId:null, branchName:branchKeys.length>1?null:(byBranch[branchKeys[0]]&&branchKeys[0]?((cust.branches||[]).find(b=>b.id===branchKeys[0])||{}).name:null), branchAddress:null,
-      items:allInvItems, subtotal:grandSubtotal, discountType:'amount', discountValue:0, discountAmount:0,
+      items:allInvItems, subtotal:grandSubtotal, discountType:'amount', discountValue:grandDeduction, discountAmount:grandDeduction,
       taxEnabled, taxRate, taxAmount:grandTax, total:grandTotal, paidAmount:paid,
       paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate,
       fromConsignment:true, consignReportIds:reportIds, commissionAmount:grandCommission, commissionType, commissionValue,
@@ -6748,12 +6757,16 @@ function updateConsignReportTotals(){
     const rate = commissionForItem(p.id, defaultType, defaultValue);
     commissionAmount += rate.type==='fixed' ? qty*rate.value : itemTotal*rate.value/100;
   });
+  const consignmentPct = parseFloat((document.getElementById('f_consignment_pct')||{}).value)||0;
+  const consignmentDeduction = subtotal*consignmentPct/100;
   const taxEnabled = document.getElementById('f_tax_enabled') ? document.getElementById('f_tax_enabled').checked : false;
   const taxRate = parseFloat((document.getElementById('f_tax_rate')||{}).value)||0;
-  const taxAmount = taxEnabled ? subtotal*taxRate/100 : 0;
-  const total = subtotal + taxAmount;
+  const netSubtotal = subtotal - consignmentDeduction;
+  const taxAmount = taxEnabled ? netSubtotal*taxRate/100 : 0;
+  const total = netSubtotal + taxAmount;
   const set = (id,val)=>{ const el = document.getElementById(id); if(el) el.textContent = val; };
   set('crSubtotal', money(subtotal));
+  set('crConsignmentDeduction', '-'+money(consignmentDeduction));
   set('crTax', money(taxAmount));
   set('crCommission', money(commissionAmount));
   set('crTotal', money(total));

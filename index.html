@@ -7506,6 +7506,24 @@ function reportLedger(){
     </table></div>`}
   `;
 }
+function partyLedgerLineLabel(j){
+  const map = {
+    sale_invoice: {label:'Sales Invoice', coll:'sales'},
+    sale_return: {label:'Sales Return', coll:'returns'},
+    purchase_invoice: {label:'Purchase Invoice', coll:'purchases'},
+    purchase_return: {label:'Purchase Return', coll:'returns'},
+    consign_report: {label:'Sales Invoice', coll:'sales'},
+  };
+  const info = map[j.sourceType];
+  if(info){
+    const doc = DB[info.coll].find(d=>d.id===j.sourceId);
+    if(doc){
+      const prefix = j.kind==='payment' ? 'Payment - ' : '';
+      return prefix+info.label+' #'+doc.number;
+    }
+  }
+  return j.memo;
+}
 function reportPartyLedger(kind){
   const isCust = kind==='customers';
   const partyList = DB[kind];
@@ -7514,21 +7532,32 @@ function reportPartyLedger(kind){
   const selectedId = ledgerPartyId[kind];
   const party = partyList.find(p=>p.id===selectedId);
   const mainAccountId = isCust ? 'acc_ar' : 'acc_ap';
+  const isDebitNormal = isCust;
+  let openingBalance = 0;
+  if(repFrom){
+    DB.journal.forEach(j=>{
+      if(j.date>=repFrom) return;
+      j.lines.forEach(l=>{
+        if(l.partyId===selectedId && l.partyType===(isCust?'customer':'supplier') && l.accountId===mainAccountId){
+          openingBalance += isDebitNormal ? (l.debit-l.credit) : (l.credit-l.debit);
+        }
+      });
+    });
+  }
   const lines = [];
   DB.journal.filter(j=> (!repFrom || j.date>=repFrom) && (!repTo || j.date<=repTo)).sort((a,b)=> a.date<b.date?-1:1).forEach(j=>{
     j.lines.forEach(l=>{
       if(l.partyId===selectedId && l.partyType===(isCust?'customer':'supplier') && l.accountId===mainAccountId){
-        lines.push({date:j.date, memo:j.memo, debit:l.debit||0, credit:l.credit||0});
+        lines.push({date:j.date, memo:partyLedgerLineLabel(j), debit:l.debit||0, credit:l.credit||0});
       }
     });
   });
-  let running = 0;
-  const isDebitNormal = isCust; // AR is asset (debit-normal), AP is liability (credit-normal)
+  let running = openingBalance;
   const rowsHtml = lines.map(l=>{
     running += isDebitNormal ? (l.debit-l.credit) : (l.credit-l.debit);
     return `<tr><td>${fmtDate(l.date)}</td><td>${esc(l.memo)}</td><td class="tnum">${l.debit?money(l.debit):'-'}</td><td class="tnum">${l.credit?money(l.credit):'-'}</td><td class="tnum" style="font-weight:700;">${money(running)}</td></tr>`;
   }).join('');
-  window._partyLedgerData = {kind, isCust, party, lines, running, isDebitNormal};
+  window._partyLedgerData = {kind, isCust, party, lines, running, isDebitNormal, openingBalance};
   return `
     <div class="field" style="max-width:340px;"><label>${isCust?'اختر العميل':'اختر المورد'}</label>
       <select onchange="ledgerPartyId['${kind}']=this.value; render();">
@@ -7536,14 +7565,15 @@ function reportPartyLedger(kind){
       </select>
     </div>
     ${party?`<div class="stat-grid" style="margin:14px 0;">
-      <div class="stat-card ${isDebitNormal?'green':'red'}"><div class="lbl">الرصيد ${isCust?'المستحق (له)':'المستحق (عليه)'}</div><div class="val">${money(Math.abs(running))}</div></div>
+      <div class="stat-card"><div class="lbl">الرصيد الافتتاحي</div><div class="val">${money(Math.abs(openingBalance))}</div></div>
+      <div class="stat-card ${isDebitNormal?'green':'red'}"><div class="lbl">صافي الرصيد المستحق ${isCust?'(له)':'(عليه)'}</div><div class="val">${money(Math.abs(running))}</div></div>
       <div class="stat-card"><div class="lbl">عدد الحركات ضمن الفترة</div><div class="val">${lines.length}</div></div>
     </div>`:''}
     ${party?`<div style="margin-bottom:10px;"><button class="btn btn-outline" onclick="printPartyLedger()">${icon('printer')} طباعة كشف الحساب</button></div>`:''}
-    ${lines.length===0? emptyState('لا توجد حركات','لا توجد قيود على هذا '+(isCust?'العميل':'المورد')+' ضمن الفترة المحددة') : `
+    ${lines.length===0 && openingBalance===0? emptyState('لا توجد حركات','لا توجد قيود على هذا '+(isCust?'العميل':'المورد')+' ضمن الفترة المحددة') : `
     <div class="table-wrap"><table>
       <thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
-      <tbody>${rowsHtml}</tbody>
+      <tbody>${repFrom?`<tr style="background:#f7f5f0;"><td>${fmtDate(repFrom)}</td><td style="font-weight:700;">رصيد افتتاحي</td><td></td><td></td><td class="tnum" style="font-weight:700;">${money(openingBalance)}</td></tr>`:''}${rowsHtml}</tbody>
     </table></div>`}
   `;
 }
@@ -7551,11 +7581,12 @@ function printPartyLedger(){
   const d = window._partyLedgerData;
   if(!d || !d.party) return;
   const companyName = DB.settings.companyName||'Z International Beauty';
-  let running = 0;
+  let running = d.openingBalance;
   const bodyRows = d.lines.map(l=>{
     running += d.isDebitNormal ? (l.debit-l.credit) : (l.credit-l.debit);
     return `<tr><td>${fmtDate(l.date)}</td><td class="doc-desc">${esc(l.memo)}</td><td class="num">${l.debit?money(l.debit):'-'}</td><td class="num">${l.credit?money(l.credit):'-'}</td><td class="num" style="font-weight:700;">${money(running)}</td></tr>`;
   }).join('');
+  const openingRow = `<tr style="background:#f7f5f0;"><td>${repFrom?fmtDate(repFrom):'—'}</td><td class="doc-desc" style="font-weight:700;">Opening Balance</td><td class="num">-</td><td class="num">-</td><td class="num" style="font-weight:700;">${money(d.openingBalance)}</td></tr>`;
   document.getElementById('printArea').innerHTML = `
     <div class="inv-print">
       <div class="doc-top">
@@ -7564,18 +7595,21 @@ function printPartyLedger(){
             ${DB.settings.logo?`<img class="doc-logo-img" src="${DB.settings.logo}">`:`<div class="doc-logo-placeholder">${esc(companyName.charAt(0))}</div>`}
             <div class="doc-company-name">${esc(companyName)}</div>
           </div>
+          ${(DB.settings.address||DB.settings.phone)?`<div class="doc-company-addr">${DB.settings.address?esc(DB.settings.address)+'<br>':''}${DB.settings.phone?esc(DB.settings.phone):''}</div>`:''}
         </div>
       </div>
       <h1 class="doc-title">Account Statement</h1>
       <div class="doc-bill-to"><div class="lbl">${d.isCust?'Customer':'Supplier'}</div><div class="nm">${esc(d.party.name)}</div></div>
       <div class="doc-meta-row">
-        <div><div class="doc-meta-lbl">Period</div><div class="doc-meta-val">${repFrom?fmtDate(repFrom):'—'} - ${repTo?fmtDate(repTo):'—'}</div></div>
-        <div><div class="doc-meta-lbl">Balance</div><div class="doc-meta-val" style="font-weight:700;">${money(Math.abs(running))}</div></div>
+        <div><div class="doc-meta-lbl">Period From</div><div class="doc-meta-val">${repFrom?fmtDate(repFrom):'Account Inception'}</div></div>
+        <div><div class="doc-meta-lbl">Period To</div><div class="doc-meta-val">${repTo?fmtDate(repTo):fmtDate(todayISO())}</div></div>
+        <div><div class="doc-meta-lbl">Net Balance Due</div><div class="doc-meta-val" style="font-weight:700;">${money(Math.abs(running))} ${running<0?'(Credit)':''}</div></div>
       </div>
       <table class="doc-table cells-left">
         <thead><tr><th>Date</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead>
-        <tbody>${bodyRows}</tbody>
+        <tbody>${repFrom?openingRow:''}${bodyRows}</tbody>
       </table>
+      <div class="doc-totals-wrap"><div class="doc-totals"><div class="doc-totals-row grand"><span>Net Balance Due</span><span class="val">${money(Math.abs(running))}${running<0?' (Credit)':''}</span></div></div></div>
       <div class="doc-footer"></div>
     </div>
   `;

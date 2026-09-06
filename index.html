@@ -375,12 +375,13 @@ tbody tr:last-child td{border-bottom:none;}
 .print-only{display:none;}
 @page{ margin:14mm; }
 @media print{
-  @page{ size:auto; margin:12mm; }
+  @page{ size:A4; margin:12mm; }
   html, body{width:auto !important; min-width:0 !important;}
   body{background:#fff !important;}
   #app, #modalRoot, #toast{display:none !important;}
   #printArea{display:block !important;width:100% !important;direction:ltr !important;margin:0 !important;padding:0 !important;}
   .print-only{display:block !important;}
+  .inv-print{min-height:calc(297mm - 24mm) !important;}
 }
 .inv-print{
   max-width:800px;margin:0 auto;background:#fff;color:#1a1a1a;
@@ -427,6 +428,10 @@ table.doc-table.cells-left td{text-align:left;}
 .doc-notes a{color:#1a1a1a;}
 .doc-notes b{color:#1a1a1a;}
 .doc-footer{border-top:1px solid #ddd;padding-top:12px;text-align:center;font-size:11px;color:#555;margin-top:auto;padding-top:12px;direction:ltr;font-family:'Poppins',sans-serif;}
+@media print{
+  .doc-footer{position:fixed;bottom:0;left:0;right:0;background:#fff;}
+  .inv-print{padding-bottom:70px !important;}
+}
 .doc-footer-page{font-size:10px;color:#999;margin-top:4px;}
 .label-sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px;direction:rtl;}
 .label-item{border:1px dashed #999;border-radius:6px;padding:10px 6px;text-align:center;font-family:'Tajawal',sans-serif;color:#1a1a1a;}
@@ -656,6 +661,7 @@ const T = {
   health:{ar:'فحص صحة النظام',en:'System Health Check'}, health_sub:{ar:'نظرة سريعة على أي حاجة محتاجة انتباه',en:'A quick look at anything that needs attention'},
   activity:{ar:'سجل الحركات',en:'Activity Log'}, activity_sub:{ar:'سجل بكل العمليات ومن قام بها',en:'Log of all actions and who performed them'},
   fixedassets:{ar:'الأصول الثابتة',en:'Fixed Assets'}, fixedassets_sub:{ar:'الأجهزة والمعدات والأثاث وإهلاكها',en:'Equipment, furniture, and their depreciation'},
+  commissionreports:{ar:'تقارير عمولة السيلز',en:'Sales Staff Commission'}, commissionreports_sub:{ar:'المستحق والمدفوع لسيلز المتاجر، وحذف السندات',en:'Owed and paid store staff commission, and voucher deletion'},
   settings:{ar:'الإعدادات',en:'Settings'}, settings_sub:{ar:'بيانات الشركة والإعدادات العامة',en:'Company info and general settings'},
   save:{ar:'حفظ',en:'Save'}, cancel:{ar:'إلغاء',en:'Cancel'}, confirmDelete:{ar:'تأكيد الحذف',en:'Confirm Delete'},
   add:{ar:'إضافة',en:'Add'}, edit:{ar:'تعديل',en:'Edit'}, delete:{ar:'حذف',en:'Delete'}, search:{ar:'بحث...',en:'Search...'},
@@ -767,6 +773,7 @@ const NAV_GROUPS = [
     {id:'quotations', icon:'journal'},
     {id:'sales', icon:'sales'},
     {id:'consignment', icon:'consign'},
+    {id:'commissionreports', icon:'reports'},
     {id:'salesreports', icon:'reports', submenu:SALES_REPORT_TYPES, tabVar:'salesReportTab'},
     {id:'customers', icon:'customers'},
     {id:'pricelists', icon:'journal'},
@@ -1426,7 +1433,7 @@ function partyAdvanceBalance(kind, partyId){
 
 /* ============ NAV / RENDER SHELL ============ */
 function navItemAllowed(id){
-  if(id==='accounts'||id==='journal'||id==='reports'||id==='treasury'||id==='fixedassets') return can('view_accounting');
+  if(id==='accounts'||id==='journal'||id==='reports'||id==='treasury'||id==='fixedassets'||id==='commissionreports') return can('view_accounting');
   if(id==='expenses') return can('view_expenses');
   if(id==='activity') return can('view_activity_log');
   return true;
@@ -1826,7 +1833,7 @@ function render(){
     dashboard: renderDashboard, sales: renderSales, purchases: renderPurchases,
     inventory: renderInventory, customers: ()=>renderParty('customers'),
     suppliers: ()=>renderParty('suppliers'), accounts: renderAccounts, journal: renderJournalPage,
-    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage, health: renderHealthCheckPage, boms: renderBomsPage, production: renderProductionPage, landedcosts: renderLandedCostsPage, purchasereceiving: renderPurchaseReceivingPage, pricelists: renderPriceListsPage, fixedassets: renderFixedAssetsPage
+    expenses: renderExpensesPage, quotations: renderQuotationsPage, consignment: renderConsignmentPage, treasury: renderTreasuryPage, reports: renderReports, activity: renderActivityPage, settings: renderSettings, crm: renderCRMPage, purchaseorders: renderPurchaseOrdersPage, salesreports: renderSalesReportsPage, health: renderHealthCheckPage, boms: renderBomsPage, production: renderProductionPage, landedcosts: renderLandedCostsPage, purchasereceiving: renderPurchaseReceivingPage, pricelists: renderPriceListsPage, fixedassets: renderFixedAssetsPage, commissionreports: renderCommissionReportsPage
   };
   c.innerHTML = (map[VIEW]||renderDashboard)();
 }
@@ -2082,7 +2089,6 @@ function printPriceList(){
       </table>
       <div class="doc-footer">
         <div>${footerParts.join(' • ')}</div>
-        <div class="doc-footer-page">Page 1 of 1</div>
       </div>
     </div>
   `;
@@ -3870,7 +3876,6 @@ function printCustomerStatement(customerId){
       </table>
       <div class="doc-footer">
         <div>${footerParts.join(' • ')}</div>
-        <div class="doc-footer-page">Page 1 of 1</div>
       </div>
     </div>
   `;
@@ -4544,7 +4549,7 @@ function printPurchaseOrder(id){
       </table>
       <div class="doc-totals-wrap"><div class="tot-line grand"><span>${dl('الإجمالي','Total')}</span><span class="tnum">${itemMoney(displayTotal)}</span></div>${isForeignCur?`<div style="font-size:11px;color:#777;text-align:left;margin-top:2px;">${dl('يعادل تقريباً','Approx. equivalent')}: ${money(o.total)}</div>`:''}</div>
       ${o.notes?`<div class="doc-notes">${esc(o.notes)}</div>`:''}
-      <div class="doc-footer"><div class="doc-footer-page">Page 1 of 1</div></div>
+      <div class="doc-footer"></div>
     </div>
   `;
   setTimeout(()=>window.print(), 80);
@@ -4880,6 +4885,7 @@ function updateSaleTotals(){
 }
 function lbl(ar, en){ return ar+' <span style="color:var(--text-muted);font-weight:400;">/ '+en+'</span>'; }
 function dl(ar, en){ return en; }
+function bl(en, ar){ return en+' / '+ar; }
 const DEFAULT_INVOICE_TEMPLATE = `<div class="doc-top">
   {{logo_block}}
   {{company_addr_block}}
@@ -4903,7 +4909,7 @@ function printInvoice(kind, id){
   const party = isSale ? customerById(inv.partyId) : supplierById(inv.partyId);
   const due = inv.total - inv.paidAmount;
   const statusAr = due<=0.009 ? 'مدفوعة بالكامل' : (inv.paidAmount>0 ? 'مدفوعة جزئياً' : 'غير مدفوعة');
-  const statusEn = due<=0.009 ? 'Paid' : (inv.paidAmount>0 ? 'Partially Paid' : 'Unpaid');
+  const statusEn = due<=0.009 ? dl('مدفوعة بالكامل','Paid') : (inv.paidAmount>0 ? dl('مدفوعة جزئياً','Partially Paid') : dl('غير مدفوعة','Unpaid'));
   const companyName = DB.settings.companyName||'Z International Beauty';
   const isForeignCur = !isSale && inv.currency && inv.currency!==DB.settings.currency;
   const curLabel = isForeignCur ? inv.currency : DB.settings.currency;
@@ -4943,13 +4949,13 @@ function printInvoice(kind, id){
   const vars = {
     logo_block: `<div class="doc-logo-block"><div style="display:flex;align-items:center;gap:11px;">${DB.settings.logo?`<img class="doc-logo-img" src="${DB.settings.logo}">`:`<div class="doc-logo-placeholder">${esc(companyName.charAt(0))}</div>`}<div class="doc-company-name">${esc(companyName)}</div></div>${(DB.settings.address||DB.settings.phone)?`<div class="doc-company-addr" style="margin-top:8px;text-align:left;">${DB.settings.address?esc(DB.settings.address)+'<br>':''}${DB.settings.phone?esc(DB.settings.phone):''}</div>`:''}</div>`,
     company_addr_block: ``,
-    doc_title: `<h1 class="doc-title">${isSale?'Sales Invoice':'Purchase Invoice'} # ${inv.number}</h1>`,
+    doc_title: `<h1 class="doc-title">${isSale?dl('فاتورة مبيعات','Sales Invoice'):dl('فاتورة مشتريات','Purchase Invoice')} # ${inv.number}</h1>`,
     bill_to_block: `<div class="doc-bill-to"><div class="lbl">${dl(isSale?'إلى':'المورد', isSale?'Bill To':'Supplier')}</div><div class="nm">${esc(inv.partyName)}</div>${party&&party.address?`<div class="ln">${esc(party.address)}</div>`:''}${party&&party.phone?`<div class="ln">${esc(party.phone)}</div>`:''}${inv.branchName?`<div class="ln" style="margin-top:8px;font-weight:700;color:#1a1a1a;">${esc(inv.branchName)}</div>${inv.branchAddress?`<div class="ln">${esc(inv.branchAddress)}</div>`:''}`:''}</div>`,
     meta_row: `${(DB.settings.warehouse && !inv.fromConsignment)?`<div style="margin-bottom:8px;"><div class="doc-meta-lbl">${dl('المخزن','Location')}</div><div class="doc-meta-val">${esc(DB.settings.warehouse)}</div></div>`:''}<div class="doc-meta-row"><div><div class="doc-meta-lbl">${dl('التاريخ','Date')}</div><div class="doc-meta-val">${fmtDate(inv.date)}</div></div>${inv.poNumber?`<div><div class="doc-meta-lbl" style="color:#B8862E;">${dl('رقم أمر شراء العميل','Customer PO No.')}</div><div class="doc-meta-val" style="font-weight:700;color:#1a1a1a;">${esc(inv.poNumber)}</div></div>`:''}<div><div class="doc-meta-lbl">${dl('الاستحقاق','Due Date')}</div><div class="doc-meta-val">${inv.dueDate?fmtDate(inv.dueDate):'-'}</div></div><div><div class="doc-meta-lbl">${dl('الحالة','Status')}</div><div class="doc-meta-val">${statusEn}</div></div>${isForeignCur?`<div><div class="doc-meta-lbl">${dl('العملة','Currency')}</div><div class="doc-meta-val">${esc(inv.currency)} (${dl('سعر الصرف','Rate')} ${inv.exchangeRate})</div></div>`:''}</div>`,
     items_table: `<table class="doc-table cells-left"><thead><tr><th>${dl('كود الصنف','Item Code')}</th><th class="num">${dl('الباركود','Barcode')}</th><th>${dl('الوصف','Description')}</th><th class="num">${dl('الكمية','Qty')}</th><th class="num">${dl('السعر','Price')}</th><th class="num">${dl('الضريبة','Tax')}</th><th class="num">${dl('الإجمالي','Amount')}</th></tr></thead><tbody>${rowsHtml}</tbody></table>`,
-    totals_block: `<div class="doc-totals-wrap"><div class="doc-totals">${dispDiscount>0.009?`<div class="doc-totals-row"><span>${dl('الإجمالي الفرعي','Subtotal')}</span><span class="val">${itemMoney(dispSubtotal)}</span></div><div class="doc-totals-row"><span>${dl('الخصم','Discount')}</span><span class="val">-${itemMoney(dispDiscount)}</span></div>`:''}<div class="doc-totals-row"><span>${dl('الإجمالي غير الخاضع للضريبة','Untaxed Amount')}</span><span class="val">${itemMoney(dispSubtotal-dispDiscount)}</span></div>${dispTax>0.009?`<div class="doc-totals-row"><span>${dl('الضريبة '+(inv.taxRate||0)+'%','Tax '+(inv.taxRate||0)+'%')}</span><span class="val">${itemMoney(dispTax)}</span></div>`:''}<div class="doc-totals-row grand"><span>${dl('الإجمالي','Total')}</span><span class="val">${itemMoney(dispTotal)}</span></div>${isForeignCur?`<div class="doc-totals-row" style="font-size:11px;color:#777;"><span>${dl('يعادل تقريباً','Approx. equivalent')}</span><span class="val">${money(inv.total)}</span></div>`:''}${(inv.fromConsignment && inv.commissionAmount>0.009)?`<div class="doc-totals-row" style="color:#8A5A0A;font-size:11px;"><span>${dl('عمولة موظفي/بائعي المتجر (منفصلة، تُدفع بسند لاحقاً)','Store Staff Commission (paid separately)')}</span><span class="val">${itemMoney(inv.commissionAmount)}</span></div>`:''}</div></div>`,
-    notes_block: `<div class="doc-notes">${(inv.termLabel && !inv.fromConsignment)?`<div><b>${dl('شروط الدفع','Payment Terms')}:</b> ${esc(inv.termLabel)}</div>`:''}${due>0.009?`<div><b>${dl('المتبقي','Balance Due')}:</b> ${itemMoney(dispDue)}</div>`:''}</div>`,
-    footer_block: `<div class="doc-footer"><div>${footerParts.join(' • ')}</div><div class="doc-footer-page">Page 1 of 1</div></div>`,
+    totals_block: `<div class="doc-totals-wrap"><div class="doc-totals">${dispDiscount>0.009?`<div class="doc-totals-row"><span>${bl('Subtotal','الإجمالي الفرعي')}</span><span class="val">${itemMoney(dispSubtotal)}</span></div><div class="doc-totals-row"><span>${inv.fromConsignment?bl('Consignment','الكونسيمنت')+' ('+(dispDiscount/(dispSubtotal||1)*100).toFixed(1)+'%)':bl('Discount','الخصم')}</span><span class="val">-${itemMoney(dispDiscount)}</span></div>`:''}<div class="doc-totals-row"><span>${bl('Untaxed Amount','الإجمالي غير الخاضع للضريبة')}</span><span class="val">${itemMoney(dispSubtotal-dispDiscount)}</span></div>${dispTax>0.009?`<div class="doc-totals-row"><span>${dl('الضريبة '+(inv.taxRate||0)+'%','Tax '+(inv.taxRate||0)+'%')}</span><span class="val">${itemMoney(dispTax)}</span></div>`:''}<div class="doc-totals-row grand"><span>${bl('Total','الإجمالي')}</span><span class="val">${itemMoney(dispTotal)}</span></div>${isForeignCur?`<div class="doc-totals-row" style="font-size:11px;color:#777;"><span>${dl('يعادل تقريباً','Approx. equivalent')}</span><span class="val">${money(inv.total)}</span></div>`:''}</div></div>`,
+    notes_block: `<div class="doc-notes">${(inv.termLabel && !inv.fromConsignment)?`<div><b>${dl('شروط الدفع','Payment Terms')}:</b> ${esc(inv.termLabel)}</div>`:''}${due>0.009?`<div><b>${dl('المتبقي','Balance Due')}:</b> ${itemMoney(dispDue)}</div>`:''}${(inv.footerNote||DB.settings.invoiceFooterNote)?`<div style="margin-top:10px;font-size:11px;color:#666;white-space:pre-line;">${esc(inv.footerNote||DB.settings.invoiceFooterNote)}</div>`:''}</div>`,
+    footer_block: `<div class="doc-footer"><div>${footerParts.join(' • ')}</div></div>`,
   };
   document.getElementById('printArea').innerHTML = `<div class="inv-print">${fillTemplate(DEFAULT_INVOICE_TEMPLATE, vars)}</div>`;
   setTimeout(()=>window.print(), 80);
@@ -4997,7 +5003,6 @@ function printReceivingNote(purchaseId){
       </div>
       <div class="doc-footer">
         <div>${footerParts.join(' • ')}</div>
-        <div class="doc-footer-page">Page 1 of 1</div>
       </div>
     </div>
   `;
@@ -5048,7 +5053,6 @@ function printDeliveryNote(saleId){
       </div>
       <div class="doc-footer">
         <div>${footerParts.join(' • ')}</div>
-        <div class="doc-footer-page">Page 1 of 1</div>
       </div>
     </div>
   `;
@@ -5594,7 +5598,6 @@ function printQuotation(id){
       ${q.notes?`<div class="doc-notes">${esc(q.notes)}</div>`:''}
       <div class="doc-footer">
         <div>${footerParts.join(' • ')}</div>
-        <div class="doc-footer-page">Page 1 of 1</div>
       </div>
     </div>
   `;
@@ -5632,6 +5635,57 @@ function consignCustomerBalances(){
   return result.sort((a,b)=>b.value-a.value);
 }
 let consignTab = 'dashboard';
+function deleteCommissionVoucher(id){
+  if(!requirePerm('manage_accounts','حذف سند عمولة سيلز')) return;
+  const v = DB.commissionPayments.find(x=>x.id===id);
+  if(!v) return;
+  if(!checkPeriodLock(v.date)) return;
+  confirmAction('حذف سند عمولة سيلز', 'سيتم عكس القيد المحاسبي بالكامل (رجوع المبلغ لرصيد العمولة المستحقة، وإلغاء الصرف من الخزينة). هل أنت متأكد؟', ()=>{
+    removeJournalBySource(v.id);
+    DB.commissionPayments = DB.commissionPayments.filter(x=>x.id!==id);
+    persist('commissionPayments');
+    logActivity('consignment', 'حذف سند عمولة سيلز '+v.number+' - '+v.customerName+' بمبلغ '+money(v.amount));
+    closeModal(); render(); toast('تم الحذف وعكس القيد بنجاح');
+  });
+}
+function renderCommissionReportsPage(){
+  const customersWithData = DB.customers.filter(c=>{
+    const gen = consignCommissionByBranch(c.id);
+    return Object.keys(gen).length>0;
+  });
+  const summaryRows = customersWithData.map(c=>{
+    const gen = consignCommissionByBranch(c.id);
+    const paid = consignCommissionPaidByBranch(c.id);
+    const totalGen = Object.values(gen).reduce((s,v)=>s+v,0);
+    const totalPaid = Object.values(paid).reduce((s,v)=>s+v,0);
+    return {customer:c, totalGen, totalPaid, owed:totalGen-totalPaid};
+  });
+  const vouchers = DB.commissionPayments.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  return `
+    <div class="card">
+      <div class="card-head"><h2>ملخص عمولة السيلز حسب المتجر</h2></div>
+      ${summaryRows.length===0?emptyState('لا توجد عمولات سيلز مسجلة بعد', 'العمولة بتتحسب تلقائياً من تقارير مبيعات الأمانة حسب فئة المنتج', false):`
+      <div class="table-wrap"><table>
+        <thead><tr><th>المتجر</th><th>إجمالي العمولة المتولّدة</th><th>المدفوع</th><th>المتبقي المستحق</th></tr></thead>
+        <tbody>${summaryRows.map(r=>`<tr><td>${esc(r.customer.name)}</td><td class="tnum">${money(r.totalGen)}</td><td class="tnum">${money(r.totalPaid)}</td><td class="tnum" style="font-weight:700;${r.owed>0.009?'color:var(--danger);':''}">${money(r.owed)}</td></tr>`).join('')}</tbody>
+      </table></div>`}
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-head"><h2>كل سندات دفع عمولة السيلز (${vouchers.length})</h2></div>
+      ${vouchers.length===0?emptyState('لا توجد سندات دفع مسجلة بعد', 'من صفحة البيع بالأمانة، دوس "دفع عمولة سيلز المتجر"', false):`
+      <div class="table-wrap"><table>
+        <thead><tr><th>رقم السند</th><th>المتجر</th><th>الفرع</th><th>التاريخ</th><th>المبلغ</th><th></th></tr></thead>
+        <tbody>${vouchers.map(v=>`
+          <tr><td>${v.number}</td><td>${esc(v.customerName)}</td><td>${v.branchName?esc(v.branchName):'-'}</td><td>${fmtDate(v.date)}</td><td class="tnum">${money(v.amount)}</td>
+          <td>
+            <button class="btn btn-outline btn-icon btn-sm" onclick="printCommissionVoucher('${v.id}')" title="طباعة">${icon('printer')}</button>
+            ${can('manage_accounts')?`<button class="btn btn-danger-o btn-icon btn-sm" onclick="deleteCommissionVoucher('${v.id}')" title="حذف">${icon('trash')}</button>`:''}
+          </td></tr>
+        `).join('')}</tbody>
+      </table></div>`}
+    </div>
+  `;
+}
 function renderConsignDashboard(){
   const storeSales = {};
   DB.consignReports.forEach(r=>{ storeSales[r.customerName] = (storeSales[r.customerName]||0)+r.total; });
@@ -6344,7 +6398,7 @@ function printTesterHandout(id){
         <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع المندوب','Delivered By')}</div></div>
         <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع الاستلام','Received By')}</div></div>
       </div>
-      <div class="doc-footer"><div>Page 1 of 1 — Free Samples, No Commercial Value</div></div>
+      <div class="doc-footer"><div>Free Samples, No Commercial Value</div></div>
     </div>
   `;
   setTimeout(()=>window.print(), 80);
@@ -6502,7 +6556,7 @@ function printCommissionVoucher(id){
           </div>
         </div>
       </div>
-      <h1 class="doc-title">سند دفع عمولة سيلز # ${v.number}</h1>
+      <h1 class="doc-title">Sales Staff Commission Voucher # ${v.number}</h1>
       <div class="doc-bill-to"><div class="lbl">${dl('المتجر','Store')}</div><div class="nm">${esc(v.customerName)}${v.branchName?' - '+esc(v.branchName):''}</div></div>
       <div class="doc-meta-row">
         <div><div class="doc-meta-lbl">${dl('التاريخ','Date')}</div><div class="doc-meta-val">${fmtDate(v.date)}</div></div>
@@ -6514,7 +6568,7 @@ function printCommissionVoucher(id){
         <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع المستلم','Received By')}</div></div>
         <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع المُسلِّم','Paid By')}</div></div>
       </div>
-      <div class="doc-footer"><div class="doc-footer-page">Page 1 of 1</div></div>
+      <div class="doc-footer"></div>
     </div>
   `;
   setTimeout(()=>window.print(), 80);
@@ -6553,6 +6607,7 @@ function openConsignReportModal(){
       <div class="field"><label>تاريخ الاستحقاق</label><input id="f_duedate" type="date" value="${todayISO()}"></div>
       <div class="field"><label>رقم أمر شراء العميل (PO Number) - اختياري</label><input id="f_po" dir="ltr" style="text-align:left;" placeholder="مثال: PO-2026-0451"></div>
     </div>
+    <div class="field"><label>ملاحظة تظهر أسفل هذه الفاتورة تحديداً (اختياري - لو سايبها فاضية هتستخدم الملاحظة الثابتة من الإعدادات لو موجودة)</label><textarea id="f_footer_note" rows="2" placeholder="مثال: This invoice is due within 30 days..."></textarea></div>
     <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px 0;">أدخل الكمية المباعة فعلياً لكل صنف بناءً على تقرير المتجر الدوري. الكمية القصوى = رصيد الأمانة الحالي.</p>
     <div id="consignReportItems"><p style="font-size:12.5px;color:var(--text-muted);">اختر المتجر أولاً لعرض أصناف الأمانة لديه.</p></div>
     <div class="row3" style="margin-top:14px;">
@@ -6563,17 +6618,6 @@ function openConsignReportModal(){
           <input type="checkbox" id="f_tax_enabled" ${DB.settings.taxEnabled?'checked':''} onchange="updateConsignReportTotals()" style="width:auto;">
           تطبيق الضريبة
         </label>
-      </div>
-    </div>
-    <div class="row3" style="margin-top:14px;">
-      <div class="field"><label>عمولة موظفي/بائعي المتجر (منفصلة - هتتدفع بسند لاحقاً، مش بتتخصم من الفاتورة)</label>
-        <div style="display:flex;gap:6px;">
-          <select id="f_commission_type" onchange="onConsignCommissionTypeChange()" style="flex:1;">
-            <option value="percent">نسبة % من المبيعات</option>
-            <option value="fixed">مبلغ ثابت لكل قطعة</option>
-          </select>
-          <input id="f_commission" type="number" step="0.01" value="0" oninput="updateConsignReportTotals()" style="flex:1;" placeholder="النسبة أو المبلغ">
-        </div>
       </div>
     </div>
     <div style="margin-top:8px;">
@@ -6592,6 +6636,7 @@ function openConsignReportModal(){
     const date = document.getElementById('f_date').value || todayISO();
     const dueDate = document.getElementById('f_duedate') ? (document.getElementById('f_duedate').value || date) : date;
     const poNumber = document.getElementById('f_po') ? document.getElementById('f_po').value.trim() : '';
+    const footerNote = document.getElementById('f_footer_note') ? document.getElementById('f_footer_note').value.trim() : '';
     const cust = customerById(partyId);
     const qtyInputs = Array.from(document.querySelectorAll('.consign-qty-sold'));
     const byBranch = {};
@@ -6612,8 +6657,8 @@ function openConsignReportModal(){
     const taxEnabled = document.getElementById('f_tax_enabled').checked;
     const taxRate = parseFloat(document.getElementById('f_tax_rate').value)||0;
     const consignmentPct = parseFloat(document.getElementById('f_consignment_pct').value)||0;
-    const commissionType = document.getElementById('f_commission_type').value||'percent';
-    const commissionValue = parseFloat(document.getElementById('f_commission').value)||0;
+    const commissionType = 'percent';
+    const commissionValue = 0;
     const cashAcc = document.getElementById('f_cashacc').value;
     const paidTotal = parseFloat(document.getElementById('f_paid').value)||0;
     const reportIds = [];
@@ -6662,7 +6707,7 @@ function openConsignReportModal(){
       branchId:null, branchName:branchKeys.length>1?null:(byBranch[branchKeys[0]]&&branchKeys[0]?((cust.branches||[]).find(b=>b.id===branchKeys[0])||{}).name:null), branchAddress:null,
       items:allInvItems, subtotal:grandSubtotal, discountType:'amount', discountValue:grandDeduction, discountAmount:grandDeduction,
       taxEnabled, taxRate, taxAmount:grandTax, total:grandTotal, paidAmount:paid,
-      paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate,
+      paymentTerm:'consignment', termLabel:'بيع بالأمانة', dueDate, footerNote,
       fromConsignment:true, consignReportIds:reportIds, commissionAmount:grandCommission, commissionType, commissionValue,
       multiBranch: branchKeys.length>1,
       createdAt:Date.now(), createdBy:currentUserName()
@@ -6738,23 +6783,15 @@ function onConsignReportPartyChange(){
   wrap.innerHTML = `<p style="font-size:11.5px;color:var(--text-muted);margin:0 0 8px 0;">مفيش فرع محدد، فبنعرضلك أرصدة كل الفروع مع بعض - أي مبيعات تدخلها لأكتر من فرع هتتقسملك تلقائياً لتقارير وفواتير منفصلة بعد الحفظ.</p>` + sections;
   updateConsignReportTotals();
 }
-function onConsignCommissionTypeChange(){
-  const typeEl = document.getElementById('f_commission_type');
-  const valEl = document.getElementById('f_commission');
-  if(typeEl && valEl) valEl.placeholder = typeEl.value==='fixed' ? 'مبلغ لكل قطعة' : 'نسبة %';
-  updateConsignReportTotals();
-}
 function updateConsignReportTotals(){
   let subtotal = 0, commissionAmount = 0;
-  const defaultType = (document.getElementById('f_commission_type')||{}).value||'percent';
-  const defaultValue = parseFloat((document.getElementById('f_commission')||{}).value)||0;
   document.querySelectorAll('.consign-qty-sold').forEach(inp=>{
     const qty = parseFloat(inp.value)||0;
     const p = productById(inp.dataset.productId);
     if(!p) return;
     const itemTotal = qty*p.salePrice;
     subtotal += itemTotal;
-    const rate = commissionForItem(p.id, defaultType, defaultValue);
+    const rate = commissionForItem(p.id, 'percent', 0);
     commissionAmount += rate.type==='fixed' ? qty*rate.value : itemTotal*rate.value/100;
   });
   const consignmentPct = parseFloat((document.getElementById('f_consignment_pct')||{}).value)||0;
@@ -6799,7 +6836,7 @@ function printConsignShipment(id){
         <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع المندوب','Delivered By')}</div></div>
         <div style="flex:1;text-align:center;"><div style="border-top:1px solid #ccc;padding-top:8px;">${dl('توقيع استلام المتجر','Store Received By')}</div></div>
       </div>
-      <div class="doc-footer"><div>Page 1 of 1</div></div>
+      <div class="doc-footer"></div>
     </div>
   `;
   setTimeout(()=>window.print(), 80);
@@ -6835,7 +6872,7 @@ function printConsignReport(id){
           <div class="doc-totals-row grand"><span>${dl('صافي المستحق','Net Due')}</span><span class="val">${money(r.total)}</span></div>
         </div>
       </div>
-      <div class="doc-footer"><div>Page 1 of 1</div></div>
+      <div class="doc-footer"></div>
     </div>
   `;
   setTimeout(()=>window.print(), 80);
@@ -8954,6 +8991,7 @@ function renderSettings(){
       <div class="field"><label>رقم الهاتف</label><input id="s_phone" value="${esc(s.phone||'')}" placeholder="01xxxxxxxxx"></div>
       <div class="field"><label>الموقع الإلكتروني (يظهر في تذييل الفاتورة)</label><input id="s_website" value="${esc(s.website||'')}" placeholder="www.example.com"></div>
       <div class="field"><label>اسم / موقع المخزن (يظهر في الفاتورة)</label><input id="s_warehouse" value="${esc(s.warehouse||'')}" placeholder="مثال: المخزن الرئيسي - القاهرة"></div>
+      <div class="field"><label>ملاحظة ثابتة تظهر أسفل كل فاتورة مطبوعة (شروط، شكر، إلخ)</label><textarea id="s_invoice_note" rows="3" placeholder="مثال: نشكركم على تعاملكم معنا. جميع البضائع المباعة غير قابلة للاسترجاع بعد 14 يوم.">${esc(s.invoiceFooterNote||'')}</textarea></div>
       <div class="field"><label>رقم الفاتورة القادمة</label><input id="s_next_inv" type="number" value="${s.nextInvoiceNumber!=null?s.nextInvoiceNumber:112001}"></div>
       <div class="field"><label>رقم إذن صرف بضاعة الأمانة القادم (CNS-OUT)</label><input id="s_next_consign_out" type="number" value="${s.nextConsignOutNumber!=null?s.nextConsignOutNumber:23}"></div>
       <div class="field"><label>رمز العملة (العملة الأساسية للنظام)</label><input id="s_currency" value="${esc(s.currency)}"></div>
@@ -9446,6 +9484,8 @@ function saveSettings(){
   if(phoneEl) DB.settings.phone = phoneEl.value.trim();
   if(webEl) DB.settings.website = webEl.value.trim();
   if(warehouseEl) DB.settings.warehouse = warehouseEl.value.trim();
+  const invoiceNoteEl = document.getElementById('s_invoice_note');
+  if(invoiceNoteEl) DB.settings.invoiceFooterNote = invoiceNoteEl.value.trim();
   if(nextInvEl && nextInvEl.value!==''){ DB.settings.nextInvoiceNumber = parseInt(nextInvEl.value)||112001; }
   if(nextConsignOutEl && nextConsignOutEl.value!==''){ DB.settings.nextConsignOutNumber = parseInt(nextConsignOutEl.value)||23; }
   const lockDateEl = document.getElementById('s_lock_date');
